@@ -21,13 +21,33 @@ export default function Login() {
   
   const [contactInfo, setContactInfo] = useState({ support_phone: "", whatsapp_number: "" });
 
-  useEffect(() => {
+ useEffect(() => {
     const fetchContactInfo = async () => {
         try {
             const res = await api.get('/contact-info/');
-            setContactInfo(res.data);
+            let data = res.data;
+            
+            // عشان نضمن إننا نقرأ الداتا صح سواء دجانجو مرجعها مصفوفة، أو Pagination، أو Object مباشر
+            if (Array.isArray(data) && data.length > 0) {
+                setContactInfo(data[0]); // بناخد أول عنصر في اللستة
+            } else if (data.results && data.results.length > 0) {
+                setContactInfo(data.results[0]); // لو دجانجو مفعل الـ Pagination
+            } else if (data.support_phone || data.whatsapp_number) {
+                setContactInfo(data); // لو راجعة مظبوطة
+            } else {
+                // لو الداتابيز فاضية أصلاً، هنحط أرقام افتراضية عشان الديزاين يظهر وميبوظش
+                setContactInfo({ 
+                    support_phone: "01000000000", 
+                    whatsapp_number: "20100000000" 
+                });
+            }
         } catch (error) { 
-            console.error("Error fetching contacts"); 
+            console.error("Error fetching contacts");
+            // لو حصل إيرور في السيرفر، نحط أرقام افتراضية برضه كـ Fallback
+            setContactInfo({ 
+                support_phone: "01000000000", 
+                whatsapp_number: "20100000000" 
+            });
         }
     };
     fetchContactInfo();
