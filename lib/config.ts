@@ -1,9 +1,8 @@
 // src/lib/config.ts
 
-// ✅ قراءة الرابط من ملف البيئة لتجنب مشاكل الـ Localhost والـ Production
-// استبدل 192.168.1.8 بالـ IP بتاعك الحقيقي
-export const API_URL = "http://192.168.1.8:8000/api";
-export const BASE_URL = "http://192.168.1.8:8000";
+// ✅ قراءة الرابط ديناميكياً (لو رفعناه هيقرأ متغير البيئة، لو مفيش هيستخدم رابط Railway)
+export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://rawasi-project-v5-production.up.railway.app";
+export const API_URL = `${BASE_URL}/api`;
 
 export const getFullImageUrl = (imagePath: string | null | undefined): string => {
     // 1. لو مفيش صورة، نرجع صورة افتراضية شيك
