@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+    images: {
+        unoptimized: true,
+        remotePatterns: [
+            { protocol: 'http', hostname: '192.168.1.8' },      // الموبايل/الشبكة المحلية
+            { protocol: 'http', hostname: 'localhost' },        // اللاب توب
+            { protocol: 'http', hostname: '127.0.0.1' },        // اللاب توب
+            { protocol: 'https', hostname: 'res.cloudinary.com' } // سيرفر الصور السحابي
+        ],
+    },
 };
 
 export default nextConfig;
