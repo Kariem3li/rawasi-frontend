@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { 
     Loader2, Phone, Lock, LogIn, Check, 
-    MessageCircle, Phone as PhoneIcon, Eye, EyeOff, AlertCircle 
+    MessageCircle, Phone as PhoneIcon, Eye, EyeOff, AlertCircle, HelpCircle 
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,9 @@ export default function Login() {
         try {
             const res = await api.get('/contact-info/');
             setContactInfo(res.data);
-        } catch (error) { console.error("Error fetching contacts"); }
+        } catch (error) { 
+            console.error("Error fetching contacts"); 
+        }
     };
     fetchContactInfo();
   }, []);
@@ -146,7 +148,7 @@ export default function Login() {
                         </div>
                         <span className="text-sm font-bold text-slate-600 select-none">تذكرني</span>
                     </label>
-                    <a href="#" className="text-sm font-bold text-amber-600 hover:text-amber-700 transition">نسيت كلمة المرور؟</a>
+                    {/* تم إزالة رابط نسيت كلمة المرور من هنا بناءً على طلبك */}
                 </div>
 
                 <button 
@@ -164,19 +166,39 @@ export default function Login() {
                 </p>
             </div>
 
-            {/* قسم الدعم الفني */}
+            {/* قسم الدعم الفني الاحترافي */}
             {(contactInfo.support_phone || contactInfo.whatsapp_number) && (
-                <div className="mt-8 pt-6 border-t border-gray-100">
-                    <p className="text-[11px] font-bold text-center text-slate-400 mb-3 uppercase tracking-wider">تواجه مشكلة؟ تواصل معنا</p>
-                    <div className="flex gap-3">
+                <div className="mt-10 pt-8 border-t border-gray-200/60 relative">
+                    {/* أيقونة المساعدة في المنتصف */}
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-3 flex items-center gap-2 text-slate-400">
+                         <HelpCircle className="w-4 h-4" />
+                    </div>
+                    
+                    <div className="text-center mb-5">
+                        <h3 className="text-[13px] font-black text-slate-700 tracking-wide">هل تواجه مشكلة في تسجيل الدخول؟</h3>
+                        <p className="text-[11px] text-slate-500 mt-1">فريق الدعم الفني متاح لمساعدتك فوراً</p>
+                    </div>
+
+                    <div className="flex gap-4">
                         {contactInfo.whatsapp_number && (
-                            <a href={`https://wa.me/${contactInfo.whatsapp_number}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-[#25D366]/10 text-[#25D366] py-3 rounded-xl border border-[#25D366]/20 hover:bg-[#25D366] hover:text-white shadow-sm transition-all text-sm font-black active:scale-95">
-                                <MessageCircle className="w-4 h-4" /> واتساب
+                            <a 
+                                href={`https://wa.me/${contactInfo.whatsapp_number}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="flex-1 group relative overflow-hidden flex items-center justify-center gap-2 bg-[#25D366]/10 text-[#25D366] h-12 rounded-xl border border-[#25D366]/30 hover:bg-[#25D366] hover:text-white shadow-sm transition-all text-sm font-black active:scale-95"
+                            >
+                                <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" /> 
+                                <span>واتساب</span>
                             </a>
                         )}
+                        
                         {contactInfo.support_phone && (
-                            <a href={`tel:${contactInfo.support_phone}`} className="flex-1 flex items-center justify-center gap-2 bg-slate-100 text-slate-700 py-3 rounded-xl border border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900 shadow-sm transition-all text-sm font-black active:scale-95">
-                                <PhoneIcon className="w-4 h-4" /> اتصال
+                            <a 
+                                href={`tel:${contactInfo.support_phone}`} 
+                                className="flex-1 group relative overflow-hidden flex items-center justify-center gap-2 bg-slate-100 text-slate-700 h-12 rounded-xl border border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900 shadow-sm transition-all text-sm font-black active:scale-95"
+                            >
+                                <PhoneIcon className="w-5 h-5 group-hover:scale-110 transition-transform" /> 
+                                <span>اتصال سريع</span>
                             </a>
                         )}
                     </div>
