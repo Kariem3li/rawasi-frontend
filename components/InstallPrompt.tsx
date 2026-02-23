@@ -91,9 +91,7 @@ export default function InstallPrompt() {
           {/* 🔴 هنا تقدري تغيري لون خلفية الأيقونة للون موقعك (بدل bg-slate-900) 🔴 */}
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-amber-600 shadow-lg">
             {/* لو عندك صورة اللوجو، امسحي الـ svg ده وحطي <img src="/logo.png" /> */}
-            <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
+            <img src="/public/icons/Gemini_Generated_Image_ykgajuykgajuykga.png" />
             <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent"></div>
           </div>
           
