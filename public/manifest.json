@@ -5,7 +5,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "theme_color": "#f59e0b",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -15,7 +15,7 @@
       "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icons/Gemini_Generated_Image_bgh57vbgh57vbgh5.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
