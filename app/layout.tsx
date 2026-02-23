@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { VideoUploadProvider } from "@/components/VideoUploadContext";
-
+import InstallPrompt from '@/components/InstallPrompt';
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -25,6 +25,7 @@ export default function RootLayout({ children }) {
       >
         <VideoUploadProvider>
         {children}
+        <InstallPrompt /> {/* هيفضل يراقب في الخلفية ويظهر وقت اللزوم */}
         </VideoUploadProvider>
       </body>
     </html>
