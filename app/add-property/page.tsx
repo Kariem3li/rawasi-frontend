@@ -107,6 +107,7 @@ export default function AddProperty() {
 
   const handleMapConfirm = (lat: string, lng: string) => { setFormData({ ...formData, latitude: lat, longitude: lng }); setShowMap(false); };
   
+  // ✅ التعديل الأول: تفعيل الدقة العالية للـ GPS
   const getLocation = () => {
     if (!navigator.geolocation) { alert("GPS غير مدعوم في متصفحك"); return; }
     setLocating(true);
@@ -115,7 +116,11 @@ export default function AddProperty() {
         setFormData({ ...formData, latitude: pos.coords.latitude.toString(), longitude: pos.coords.longitude.toString() });
         setLocating(false);
       },
-      () => { setLocating(false); alert("فشل تحديد الموقع. يرجى التحديد يدوياً من الخريطة."); }
+      () => { 
+        setLocating(false); 
+        alert("فشل تحديد الموقع. يرجى التأكد من تفعيل الـ GPS وإعطاء الصلاحية للمتصفح."); 
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // الدقة العالية هنا
     );
   };
 
@@ -348,7 +353,16 @@ export default function AddProperty() {
     <main className="min-h-screen bg-[#F8FAFC] pb-32 text-slate-800 font-sans dir-rtl">
       <Navbar />
       {submitting && <ProgressOverlay progress={uploadProgress} message={statusMsg} />}
-      {showMap && <MapPicker onConfirm={handleMapConfirm} onClose={() => setShowMap(false)} />}
+      
+      {/* ✅ التعديل التاني: إرسال الإحداثيات اللي جبناها للخريطة عشان تفتح عليها */}
+      {showMap && (
+        <MapPicker 
+           initialLat={formData.latitude} 
+           initialLng={formData.longitude} 
+           onConfirm={handleMapConfirm} 
+           onClose={() => setShowMap(false)} 
+        />
+      )}
 
       <div className="bg-slate-900 pt-10 pb-28 px-4 text-center rounded-b-[2.5rem] md:rounded-b-[4rem] relative overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)]">
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent"></div>
