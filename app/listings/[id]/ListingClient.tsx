@@ -251,7 +251,15 @@ export default function ListingClient({ listing }: { listing: any }) {
                                 className="absolute inset-0 w-full h-full border-0"
                              />
                         ) : (
-                            <video controls className="w-full h-full object-cover" poster={getFullImageUrl(listing.thumbnail)}>
+                            // ✅ التعديل السحري للايفون هنا (playsInline و preload)
+                            <video 
+                                controls 
+                                playsInline 
+                                webkit-playsinline="true"
+                                preload="metadata"
+                                className="w-full h-full object-cover" 
+                                poster={getFullImageUrl(listing.thumbnail)}
+                            >
                                 <source src={getFullImageUrl(listing.video) as string} type="video/mp4" />
                             </video>
                         )}

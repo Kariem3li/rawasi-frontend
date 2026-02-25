@@ -27,23 +27,34 @@ export default function Login() {
             const res = await api.get('/contact-info/');
             let data = res.data;
             
-            // عشان نضمن إننا نقرأ الداتا صح سواء دجانجو مرجعها مصفوفة، أو Pagination، أو Object مباشر
+            // هنستخرج الأرقام سواء كانت جوا Array أو لوحدها
+            let supportPhone = "";
+            let whatsappNum = "";
+
             if (Array.isArray(data) && data.length > 0) {
-                setContactInfo(data[0]); // بناخد أول عنصر في اللستة
-            } else if (data.results && data.results.length > 0) {
-                setContactInfo(data.results[0]); // لو دجانجو مفعل الـ Pagination
+                supportPhone = data[0].support_phone;
+                whatsappNum = data[0].whatsapp_number;
             } else if (data.support_phone || data.whatsapp_number) {
-                setContactInfo(data); // لو راجعة مظبوطة
-            } else {
-                // لو الداتابيز فاضية أصلاً، هنحط أرقام افتراضية عشان الديزاين يظهر وميبوظش
+                supportPhone = data.support_phone;
+                whatsappNum = data.whatsapp_number;
+            }
+
+            // ✅ لو الباك إند رجعها "فاضية" بسبب الكاش، هنحط الأرقام دي إجباري عشان الديزاين يظهر
+            if (!supportPhone && !whatsappNum) {
                 setContactInfo({ 
-                    support_phone: "01000000000", 
-                    whatsapp_number: "20100000000" 
+                    support_phone: "01000000000", // حطي رقمك الحقيقي هنا
+                    whatsapp_number: "20100000000" // حطي رقمك الحقيقي هنا
+                });
+            } else {
+                setContactInfo({ 
+                    support_phone: supportPhone, 
+                    whatsapp_number: whatsappNum 
                 });
             }
+
         } catch (error) { 
             console.error("Error fetching contacts");
-            // لو حصل إيرور في السيرفر، نحط أرقام افتراضية برضه كـ Fallback
+            // في حالة خطأ السيرفر
             setContactInfo({ 
                 support_phone: "01000000000", 
                 whatsapp_number: "20100000000" 

@@ -118,11 +118,16 @@ export default function MapPicker({ onConfirm, onClose, initialLat, initialLng }
                  zoom={14} 
                  style={{ height: "100%", width: "100%", zIndex: 0 }}
                  zoomControl={false} // إخفاء أزرار الزوم الافتراضية
+                 tap={false} // ✅ السر الأول: قفلنا الـ tap عشان الآيفون يشتغل بصاروخ وميهنجش
              >
+                 {/* ✅ السر التاني: غيرنا سيرفرات الخريطة لـ Google Maps عشان الأحياء الجديدة تظهر */}
                  <TileLayer 
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                    attribution='&copy; Google Maps'
+                    url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" 
                  />
+                 {/* 💡 لو عايزة الخريطة تظهر قمر صناعي (أراضي وشوارع حقيقية) فعلي السطر ده وامسحي اللي فوقه:
+                   url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+                 */}
                  <ChangeView center={position} /> 
                  <LocationMarker position={position} setPosition={setPosition} />
              </MapContainer>
