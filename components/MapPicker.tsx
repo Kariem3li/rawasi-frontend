@@ -118,7 +118,7 @@ export default function MapPicker({ onConfirm, onClose, initialLat, initialLng }
                  zoom={14} 
                  style={{ height: "100%", width: "100%", zIndex: 0 }}
                  zoomControl={false} // إخفاء أزرار الزوم الافتراضية
-                 tap={false} // ✅ السر الأول: قفلنا الـ tap عشان الآيفون يشتغل بصاروخ وميهنجش
+                 {...{ tap: false }} // ✅ السر الأول: قفلنا الـ tap عشان الآيفون يشتغل بصاروخ وميهنجش
              >
                  {/* ✅ السر التاني: غيرنا سيرفرات الخريطة لـ Google Maps عشان الأحياء الجديدة تظهر */}
                  <TileLayer 
