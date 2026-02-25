@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-lea
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useState, useEffect } from "react";
-import { Crosshair, Check, X, Loader2, MapPin } from "lucide-react";
+import { Crosshair, Check, X, Loader2, MapPin, Layers } from "lucide-react";
 
 // 1. إصلاح أيقونة Leaflet المختفية بتصميم محسن
 const icon = L.icon({
@@ -55,15 +55,16 @@ export default function MapPicker({ onConfirm, onClose, initialLat, initialLng }
   // 4. تحديد نقطة البداية (العاشر من رمضان)
   const defaultLocation = { lat: 30.3060, lng: 31.7376 }; 
   
-  // تحديد الموقع بناءً على الإحداثيات الممررة أو الافتراضية
   const startPosition = (initialLat && initialLng && !isNaN(parseFloat(initialLat)))
     ? { lat: parseFloat(initialLat), lng: parseFloat(initialLng) }
     : defaultLocation;
 
   const [position, setPosition] = useState<any>(startPosition);
   const [loadingLoc, setLoadingLoc] = useState(false);
+  
+  // حالة لاختيار نوع الخريطة (التقسيمات أو جوجل)
+  const [mapType, setMapType] = useState<'osm' | 'google'>('osm');
 
-  // دالة تحديد الموقع الحالي (GPS)
   const handleLocateMe = () => {
     if (!navigator.geolocation) {
       alert("عذراً، متصفحك لا يدعم تحديد الموقع (GPS).");
@@ -81,19 +82,17 @@ export default function MapPicker({ onConfirm, onClose, initialLat, initialLng }
         alert("تعذر تحديد موقعك بدقة. يرجى التأكد من تفعيل الـ GPS والسماح للمتصفح بالوصول.");
         setLoadingLoc(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // إعدادات دقة عالية
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 isolate">
-      {/* طبقة شفافة زجاجية كخلفية */}
       <div 
         className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-300" 
         onClick={onClose}
       />
 
-      {/* المودال الرئيسي */}
       <div className="bg-white w-full max-w-2xl rounded-[2rem] overflow-hidden shadow-2xl flex flex-col h-[85vh] relative z-10 animate-in zoom-in-95 duration-300">
         
         {/* Header */}
@@ -111,29 +110,48 @@ export default function MapPicker({ onConfirm, onClose, initialLat, initialLng }
 
         {/* Map Body */}
         <div className="flex-1 relative bg-slate-100/50">
-           {/* الخريطة */}
            <div className="absolute inset-0 h-full w-full">
              <MapContainer 
                  center={position} 
-                 zoom={14} 
+                 zoom={15} // زودنا الزوم شوية عشان أرقام القطع تبان أسرع
                  style={{ height: "100%", width: "100%", zIndex: 0 }}
-                 zoomControl={false} // إخفاء أزرار الزوم الافتراضية
-                 {...{ tap: false }} // ✅ السر الأول: قفلنا الـ tap عشان الآيفون يشتغل بصاروخ وميهنجش
+                 zoomControl={false}
+                 {...{ tap: false }} // الحل السحري للايفون موجود ومستمر
              >
-                 {/* ✅ السر التاني: غيرنا سيرفرات الخريطة لـ Google Maps عشان الأحياء الجديدة تظهر */}
-                 <TileLayer 
-                    attribution='&copy; Google Maps'
-                    url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" 
-                 />
-                 {/* 💡 لو عايزة الخريطة تظهر قمر صناعي (أراضي وشوارع حقيقية) فعلي السطر ده وامسحي اللي فوقه:
-                   url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-                 */}
+                 {mapType === 'osm' ? (
+                     // خريطة OpenStreetMap التي تظهر أرقام القطع والمجاورات
+                     <TileLayer 
+                        attribution='&copy; OpenStreetMap'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                     />
+                 ) : (
+                     // خريطة جوجل للشوارع الرئيسية
+                     <TileLayer 
+                        attribution='&copy; Google Maps'
+                        url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" 
+                     />
+                 )}
                  <ChangeView center={position} /> 
                  <LocationMarker position={position} setPosition={setPosition} />
              </MapContainer>
            </div>
 
-           {/* زرار GPS العائم (بتصميم فخم) */}
+           {/* زر التبديل بين نوعي الخرائط (التقسيمات / الشوارع) */}
+           <div className="absolute top-4 right-4 z-[400] bg-white p-1 rounded-2xl shadow-lg border border-gray-100 flex gap-1 dir-rtl">
+               <button 
+                  onClick={() => setMapType('osm')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mapType === 'osm' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-gray-50'}`}
+               >
+                  التقسيمات والأرقام
+               </button>
+               <button 
+                  onClick={() => setMapType('google')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mapType === 'google' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-gray-50'}`}
+               >
+                  خريطة الشوارع
+               </button>
+           </div>
+
            <button 
              onClick={handleLocateMe}
              disabled={loadingLoc}
@@ -147,15 +165,13 @@ export default function MapPicker({ onConfirm, onClose, initialLat, initialLng }
              )}
            </button>
 
-           {/* تلميح صغير فوق الخريطة */}
-           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg pointer-events-none">
+           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[400] bg-slate-900/80 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg pointer-events-none">
                اسحب الخريطة واضغط لتغيير مكان الدبوس
            </div>
         </div>
 
         {/* Footer */}
         <div className="p-5 border-t border-gray-100 bg-white z-10 flex flex-col sm:flex-row items-center gap-4 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] dir-rtl">
-           
            <div className="flex-1 text-center sm:text-right">
                <p className="text-xs text-gray-500 font-bold mb-1">الإحداثيات الحالية:</p>
                <p className="text-sm font-mono font-black text-slate-800 bg-gray-50 px-3 py-1.5 rounded-lg inline-block border border-gray-100 dir-ltr">
