@@ -56,9 +56,9 @@ export default function AdminPromotions() {
             <div className="bg-amber-100 p-2 rounded-lg"><Star className="w-6 h-6 text-amber-600" /></div>
             <h2 className="text-2xl font-black text-slate-800">الإعلانات المميزة والمشاريع</h2>
         </div>
-        <button className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-500 hover:text-slate-900 transition-colors shadow-md">
-          + إضافة مشروع/إعلان جديد
-        </button>
+        <Link href="/admin/promotions/add" className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-500 hover:text-slate-900 transition-colors shadow-md inline-block">
+        + إضافة مشروع/إعلان جديد
+        </Link>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
