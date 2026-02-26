@@ -5,28 +5,28 @@ import { usePathname } from "next/navigation";
 import AdminGuard from "@/components/AdminGuard";
 import { 
   LayoutDashboard, Building, Star, Users, 
-  Map, Tags, Bell, Settings, LogOut 
+  Map, Settings, LogOut 
 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  // ✅ القائمة النظيفة (بدون لينكات مكسورة)
   const menuItems = [
     { name: "الرئيسية", icon: LayoutDashboard, path: "/admin" },
     { name: "العقارات", icon: Building, path: "/admin/listings" },
     { name: "الإعلانات المميزة", icon: Star, path: "/admin/promotions" },
     { name: "المناطق الجغرافية", icon: Map, path: "/admin/geography" },
-    { name: "التصنيفات والمواصفات", icon: Tags, path: "/admin/categories" },
-    { name: "المستخدمين", icon: Users, path: "/admin/users" },
-    { name: "الإشعارات الجماعية", icon: Bell, path: "/admin/broadcast" },
-    { name: "إعدادات الموقع", icon: Settings, path: "/admin/settings" },
+    { name: "المستخدمين والإشعارات", icon: Users, path: "/admin/users" }, // دمجناهم هنا
+    // { name: "التصنيفات والمواصفات", icon: Tags, path: "/admin/categories" }, // هنعملها قدام
+    // { name: "إعدادات الموقع", icon: Settings, path: "/admin/settings" }, // هنعملها قدام
   ];
 
   return (
     <AdminGuard>
       <div className="min-h-screen bg-slate-50 flex dir-rtl font-sans">
         
-        {/* 📋 القائمة الجانبية (Sidebar) */}
+        {/* 📋 القائمة الجانبية */}
         <aside className="w-64 bg-slate-900 text-white flex-shrink-0 hidden md:flex flex-col shadow-2xl fixed h-full z-50">
           <div className="p-6 text-center border-b border-slate-800">
             <h2 className="text-2xl font-black tracking-wider">
@@ -37,7 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
             {menuItems.map((item) => {
-              const isActive = pathname === item.path;
+              const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
               return (
                 <Link key={item.path} href={item.path}>
                   <div className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${
@@ -61,7 +61,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* 📄 منطقة المحتوى الرئيسية */}
         <main className="flex-1 md:mr-64 flex flex-col min-h-screen">
-          {/* Header علوي بسيط للموبايل والترحيب */}
           <header className="bg-white h-20 shadow-sm border-b border-gray-100 flex items-center px-8 justify-between sticky top-0 z-40">
              <h1 className="font-black text-xl text-slate-800 hidden md:block">لوحة التحكم</h1>
              <div className="md:hidden font-black text-xl text-slate-900">رواسي <span className="text-amber-500">أدمن</span></div>
