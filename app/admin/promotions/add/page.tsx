@@ -23,8 +23,8 @@ export default function AddPromotion() {
   const [developerLogo, setDeveloperLogo] = useState<File | null>(null);
   const [gallery, setGallery] = useState<File[]>([]);
 
-  // 🔴 1. حالات (States) جديدة للوحدات وصور قبل وبعد
-  const [units, setUnits] = useState([{ custom_title: "" }]);
+  // 🔴 1. تم تحديث حالة الوحدات لتشمل السعر والصورة
+  const [units, setUnits] = useState([{ custom_title: "", price: "", image: null as File | null }]);
   const [transformations, setTransformations] = useState([{ title: "", before: null as File | null, after: null as File | null }]);
 
   useEffect(() => {
@@ -63,16 +63,27 @@ export default function AddPromotion() {
     setGallery(newGallery);
   };
 
-  // 🔴 2. دوال التحكم في أنواع الوحدات
-  const handleUnitChange = (index: number, val: string) => {
+  // 🔴 2. دوال التحكم في بيانات الوحدة (الاسم، السعر، الصورة)
+  const handleUnitChange = (index: number, field: string, val: any) => {
     const newUnits = [...units];
-    newUnits[index].custom_title = val;
+    (newUnits[index] as any)[field] = val;
     setUnits(newUnits);
   };
-  const addUnit = () => setUnits([...units, { custom_title: "" }]);
+
+  const handleUnitImageSelect = async (index: number, e: any) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    try {
+        const compressedFile = await imageCompression(e.target.files[0], { maxSizeMB: 1, maxWidthOrHeight: 800 });
+        const newUnits = [...units];
+        newUnits[index].image = compressedFile;
+        setUnits(newUnits);
+    } catch (error) { console.error(error); }
+  };
+
+  const addUnit = () => setUnits([...units, { custom_title: "", price: "", image: null }]);
   const removeUnit = (index: number) => setUnits(units.filter((_, i) => i !== index));
 
-  // 🔴 3. دوال التحكم في صور قبل وبعد
+  // دوال التحكم في صور قبل وبعد
   const handleTransTitleChange = (index: number, val: string) => {
     const newTrans = [...transformations];
     newTrans[index].title = val;
@@ -115,7 +126,7 @@ export default function AddPromotion() {
       const galleryUrls = [];
       for (const img of gallery) galleryUrls.push(await uploadToCloudinary(img));
 
-      // 🔴 4. رفع صور قبل وبعد (لو موجودة)
+      // رفع صور التشطيبات
       const transPayload = [];
       if (formData.promo_type === 'SERVICE') {
           for (let i = 0; i < transformations.length; i++) {
@@ -129,8 +140,25 @@ export default function AddPromotion() {
           }
       }
 
-      // تنظيف الوحدات الفارغة
-      const validUnits = units.filter(u => u.custom_title.trim() !== "");
+      // 🔴 3. تجهيز الوحدات ورفع صورها لـ Cloudinary
+      const unitsPayload = [];
+      if (formData.promo_type === 'PROJECT') {
+          for (let i = 0; i < units.length; i++) {
+              const u = units[i];
+              if (u.custom_title.trim() !== "") {
+                  let unitImgUrl = "";
+                  if (u.image) {
+                      setStatusMsg(`جاري رفع صورة الوحدة: ${u.custom_title}...`);
+                      unitImgUrl = await uploadToCloudinary(u.image);
+                  }
+                  unitsPayload.push({
+                      custom_title: u.custom_title,
+                      price: u.price || 0,
+                      image: unitImgUrl // سيتم تخزين الرابط في الداتابيز
+                  });
+              }
+          }
+      }
 
       setStatusMsg("جاري حفظ بيانات الإعلان...");
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -140,8 +168,8 @@ export default function AddPromotion() {
         cover_image: coverUrl,
         developer_logo: logoUrl,
         gallery: galleryUrls,
-        transformations: transPayload, // 👈 بنبعتهم للباك إند
-        units: formData.promo_type === 'PROJECT' ? validUnits : [] // 👈 بنبعتهم للباك إند
+        transformations: transPayload,
+        units: unitsPayload // 👈 إرسال الوحدات المجهزة
       };
 
       await api.post('/admin-dashboard/promotions/add/', payload, {
@@ -227,18 +255,41 @@ export default function AddPromotion() {
                 </div>
                 <div><label className="block text-xs font-bold text-slate-600 mb-1">مميزات المشروع (افصل بينها بفاصلة)</label><input name="project_features" value={formData.project_features} onChange={handleChange} placeholder="جيم, حمام سباحة, أمن 24 ساعة..." className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-emerald-400 outline-none" /></div>
 
-                {/* --- أنواع الوحدات للمشاريع --- */}
+                {/* 🔴 الأنواع والوحدات (تم التحديث لدعم الصورة والسعر) */}
                 <div className="pt-4">
-                  <h4 className="font-bold text-emerald-800 mb-3 flex items-center gap-2"><SplitSquareHorizontal className="w-4 h-4"/> أنواع الوحدات في المشروع</h4>
-                  <div className="space-y-3">
+                  <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2"><SplitSquareHorizontal className="w-5 h-5"/> نماذج الوحدات المتاحة</h4>
+                  <div className="space-y-4">
                     {units.map((u, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
-                            <input type="text" value={u.custom_title} onChange={(e) => handleUnitChange(idx, e.target.value)} placeholder="مثال: شقة 150م بحديقة" className="flex-1 h-12 px-4 rounded-xl border-2 border-white focus:border-emerald-400 outline-none font-bold text-sm" />
-                            <button type="button" onClick={() => removeUnit(idx)} className="p-3 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition"><Trash2 className="w-5 h-5"/></button>
+                        <div key={idx} className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm relative">
+                            {/* رفع صورة الوحدة */}
+                            <label className="w-full md:w-28 h-28 border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center cursor-pointer hover:bg-slate-50 relative overflow-hidden shrink-0">
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUnitImageSelect(idx, e)} />
+                                {u.image ? (
+                                    <img src={URL.createObjectURL(u.image)} className="absolute inset-0 w-full h-full object-cover" />
+                                ) : (
+                                    <div className="text-center"><ImageIcon className="w-6 h-6 text-slate-400 mx-auto mb-1"/><span className="text-[10px] font-bold text-slate-500">صورة النموذج</span></div>
+                                )}
+                            </label>
+
+                            {/* الحقول (الاسم والسعر) */}
+                            <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">اسم النموذج/الوحدة</label>
+                                    <input type="text" value={u.custom_title} onChange={(e) => handleUnitChange(idx, 'custom_title', e.target.value)} placeholder="مثال: فيلا توين هاوس" className="w-full h-11 px-3 rounded-lg border-2 border-slate-100 focus:border-emerald-400 outline-none font-bold text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">السعر (ج.م)</label>
+                                    <input type="number" value={u.price} onChange={(e) => handleUnitChange(idx, 'price', e.target.value)} placeholder="مثال: 5000000" className="w-full h-11 px-3 rounded-lg border-2 border-slate-100 focus:border-emerald-400 outline-none font-bold text-sm dir-ltr text-right" />
+                                </div>
+                            </div>
+
+                            {/* زر الحذف */}
+                            <button type="button" onClick={() => removeUnit(idx)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition absolute top-2 left-2 md:relative md:top-0 md:left-0"><Trash2 className="w-5 h-5"/></button>
                         </div>
                     ))}
-                    <button type="button" onClick={addUnit} className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 px-4 py-2 rounded-xl transition">
-                        <PlusCircle className="w-4 h-4"/> إضافة نوع وحدة
+                    
+                    <button type="button" onClick={addUnit} className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-100/50 px-5 py-3 rounded-xl transition w-max">
+                        <PlusCircle className="w-5 h-5"/> إضافة نموذج جديد
                     </button>
                   </div>
                 </div>
@@ -277,7 +328,7 @@ export default function AddPromotion() {
             </div>
         )}
 
-        {/* قسم: التواصل (ما عدا VIP) */}
+        {/* قسم: التواصل */}
         {formData.promo_type !== 'LISTING' && (
             <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 grid md:grid-cols-2 gap-4">
                 <div><label className="block text-xs font-bold text-slate-600 mb-1">رقم الاتصال</label><input name="phone_number" value={formData.phone_number} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-slate-100 focus:border-amber-500 outline-none dir-ltr text-right" /></div>
