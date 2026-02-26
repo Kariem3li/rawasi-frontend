@@ -180,7 +180,7 @@ export default function AddPromotion() {
       setTimeout(() => router.push('/admin/promotions'), 1500);
     } catch (error) {
       console.error(error);
-      alert("حدث خطأ أثناء الحفظ");
+      alert("سبب الرفض من دجانجو: " + JSON.stringify(error.response?.data || error.message));
       setSubmitting(false);
     }
   };
