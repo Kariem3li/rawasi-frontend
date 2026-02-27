@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, UploadCloud, Image as ImageIcon, PlusCircle, X, Search, Trash2, SplitSquareHorizontal } from "lucide-react";
+import { Loader2, ArrowLeft, UploadCloud, Image as ImageIcon, PlusCircle, X, Search, Trash2, SplitSquareHorizontal, MapPin } from "lucide-react";
 import api from "@/lib/axios";
 import axios from 'axios';
 import imageCompression from 'browser-image-compression';
@@ -357,7 +357,7 @@ export default function AddPromotion() {
             </div>
             <p className="text-[10px] text-slate-500 font-bold mt-1">💡 نصيحة: افتح خرائط جوجل، اضغط "كليك يمين" على موقع المشروع، وانسخ الأرقام (خط العرض ثم خط الطول).</p>
         </div>
-        
+
         {/* قسم: الصور والميديا */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
           <h3 className="font-black text-lg text-slate-800 border-b pb-4">الصور والميديا الرئيسية</h3>
