@@ -21,13 +21,21 @@ export default function Login() {
   
   const [contactInfo, setContactInfo] = useState({ support_phone: "", whatsapp_number: "" });
 
- useEffect(() => {
+  // 🚀 السحر الأول: استرجاع رقم الهاتف لو كان محفوظ قبل كده
+  useEffect(() => {
+      const savedPhone = localStorage.getItem("remembered_phone");
+      if (savedPhone) {
+          setPhone(savedPhone);
+          setRememberMe(true); // بنعلم على تذكرني تلقائياً
+      }
+  }, []);
+
+  useEffect(() => {
     const fetchContactInfo = async () => {
         try {
             const res = await api.get('/contact-info/');
             let data = res.data;
             
-            // هنستخرج الأرقام سواء كانت جوا Array أو لوحدها
             let supportPhone = "";
             let whatsappNum = "";
 
@@ -39,11 +47,10 @@ export default function Login() {
                 whatsappNum = data.whatsapp_number;
             }
 
-            // ✅ لو الباك إند رجعها "فاضية" بسبب الكاش، هنحط الأرقام دي إجباري عشان الديزاين يظهر
             if (!supportPhone && !whatsappNum) {
                 setContactInfo({ 
-                    support_phone: "01000000000", // حطي رقمك الحقيقي هنا
-                    whatsapp_number: "20100000000" // حطي رقمك الحقيقي هنا
+                    support_phone: "01000000000",
+                    whatsapp_number: "20100000000"
                 });
             } else {
                 setContactInfo({ 
@@ -54,7 +61,6 @@ export default function Login() {
 
         } catch (error) { 
             console.error("Error fetching contacts");
-            // في حالة خطأ السيرفر
             setContactInfo({ 
                 support_phone: "01000000000", 
                 whatsapp_number: "20100000000" 
@@ -83,16 +89,20 @@ export default function Login() {
         const token = res.data.token;
         const fullName = res.data.name || phone;
 
-        // الحفظ حسب رغبة المستخدم
-        const storage = rememberMe ? localStorage : sessionStorage;
-        storage.setItem('token', token);
-        storage.setItem('username', fullName);
-        
-        if (res.data.is_staff) {
-            storage.setItem('is_staff', "true");
+        // 🚀 السحر التاني: التعامل مع الذاكرة باحترافية
+        if (rememberMe) {
+            localStorage.setItem('token', token);
+            localStorage.setItem('username', fullName);
+            localStorage.setItem('remembered_phone', phone); // نحفظ الرقم للمرات الجاية
+            if (res.data.is_staff) localStorage.setItem('is_staff', "true");
+        } else {
+            sessionStorage.setItem('token', token);
+            sessionStorage.setItem('username', fullName);
+            localStorage.removeItem('remembered_phone'); // نمسح الرقم لو مش عايز يفتكره
+            if (res.data.is_staff) sessionStorage.setItem('is_staff', "true");
         }
 
-        router.push("/"); // ✅ توجيه سريع بدون Reload
+        router.push("/"); 
 
     } catch (err: any) {
         if (err.response && err.response.data && err.response.data.non_field_errors) {
@@ -109,7 +119,6 @@ export default function Login() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans dir-rtl relative">
       <Navbar />
       
-      {/* خلفية جمالية */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-[100px] opacity-40"></div>
           <div className="absolute top-40 -left-40 w-96 h-96 bg-slate-300 rounded-full mix-blend-multiply filter blur-[100px] opacity-40"></div>
@@ -133,7 +142,8 @@ export default function Login() {
                 </div>
             )}
 
-            <div className="space-y-5">
+            {/* 🚀 السحر التالت: ضفنا autoComplete عشان المتصفح يفهم الحقول */}
+            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-5">
                 <div>
                     <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">رقم الهاتف</label>
                     <div className="relative">
@@ -141,11 +151,11 @@ export default function Login() {
                         <input 
                             type="tel" 
                             dir="ltr"
+                            autoComplete="username tel" 
                             className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-12 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm text-right"
                             placeholder="010XXXXXXXX"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                         />
                     </div>
                 </div>
@@ -156,11 +166,11 @@ export default function Login() {
                         <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input 
                             type={showPassword ? "text" : "password"} 
-                            className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-12 pl-12 font-black text-slate-800 outline-none transition-all shadow-sm"
+                            autoComplete="current-password"
+                            className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-12 pl-12 font-black text-slate-800 outline-none transition-all shadow-sm text-left dir-ltr"
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                         />
                         <button 
                             type="button"
@@ -173,23 +183,25 @@ export default function Login() {
                 </div>
 
                 <div className="flex items-center justify-between mt-2">
-                    <label className="flex items-center gap-2 cursor-pointer group">
+                    <label 
+                        className="flex items-center gap-2 cursor-pointer group"
+                        onClick={() => setRememberMe(!rememberMe)}
+                    >
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-amber-500 border-amber-500' : 'border-slate-300 group-hover:border-amber-400 bg-white'}`}>
                             {rememberMe && <Check className="w-3.5 h-3.5 text-white" />}
                         </div>
                         <span className="text-sm font-bold text-slate-600 select-none">تذكرني</span>
                     </label>
-                    {/* تم إزالة رابط نسيت كلمة المرور من هنا بناءً على طلبك */}
                 </div>
 
                 <button 
-                    onClick={handleLogin}
+                    type="submit"
                     disabled={loading}
                     className="w-full bg-slate-900 text-white h-14 rounded-2xl font-black text-lg shadow-[0_10px_20px_rgba(0,0,0,0.15)] hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95 flex items-center justify-center gap-2 mt-6 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
                 >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "دخول"}
                 </button>
-            </div>
+            </form>
 
             <div className="mt-8 text-center">
                 <p className="text-sm text-slate-500 font-bold">
@@ -197,10 +209,8 @@ export default function Login() {
                 </p>
             </div>
 
-            {/* قسم الدعم الفني الاحترافي */}
             {(contactInfo.support_phone || contactInfo.whatsapp_number) && (
                 <div className="mt-10 pt-8 border-t border-gray-200/60 relative">
-                    {/* أيقونة المساعدة في المنتصف */}
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white px-3 flex items-center gap-2 text-slate-400">
                          <HelpCircle className="w-4 h-4" />
                     </div>
