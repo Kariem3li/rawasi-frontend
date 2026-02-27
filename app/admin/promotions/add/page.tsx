@@ -25,7 +25,7 @@ export default function AddPromotion() {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [developerLogo, setDeveloperLogo] = useState<File | null>(null);
   const [gallery, setGallery] = useState<File[]>([]);
-
+  const [showMap, setShowMap] = useState(false); // 👈 دي اللي هتبين وتخفي الخريطة
   // 🔴 1. تم تحديث حالة الوحدات لتشمل السعر والصورة
   const [units, setUnits] = useState([{ custom_title: "", price: "", image: null as File | null }]);
   const [transformations, setTransformations] = useState([{ title: "", before: null as File | null, after: null as File | null }]);
@@ -347,30 +347,43 @@ export default function AddPromotion() {
                 <input name="address" value={formData.address} onChange={handleChange} placeholder="مثال: التجمع الخامس، شارع التسعين الشمالي، بجوار..." className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none font-bold" />
             </div>
 
-            {/* 🗺️ الخريطة التفاعلية */}
-            <div className="space-y-2 pt-2">
-                <label className="block text-sm font-black text-blue-800 mb-2">حدد الموقع على الخريطة (اضغط على المكان لتعليق الدبوس 📍)</label>
-                <div className="border-4 border-white rounded-2xl overflow-hidden shadow-sm relative z-0">
-                     <MapPicker 
-                        lat={formData.latitude} 
-                        lng={formData.longitude} 
-                        onChange={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})} 
-                     />
-                </div>
+            {/* 🗺️ زرار فتح الخريطة التفاعلية */}
+            <div className="pt-2">
+                <button 
+                    type="button" 
+                    onClick={() => setShowMap(true)}
+                    className="w-full md:w-auto px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-slate-900 transition-colors shadow-md"
+                >
+                    <MapPin className="w-5 h-5" /> 
+                    {formData.latitude ? "تعديل الموقع على الخريطة" : "تحديد الموقع على الخريطة 📍"}
+                </button>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 pt-2">
                 <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">خط العرض (يتم تعبئته تلقائياً)</label>
-                    <input name="latitude" type="number" step="any" value={formData.latitude} onChange={handleChange} className="w-full h-10 px-4 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none dir-ltr text-left text-slate-500 font-mono text-sm cursor-not-allowed" readOnly />
+                    <input name="latitude" type="number" step="any" value={formData.latitude} className="w-full h-10 px-4 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none dir-ltr text-left text-slate-500 font-mono text-sm cursor-not-allowed" readOnly />
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">خط الطول (يتم تعبئته تلقائياً)</label>
-                    <input name="longitude" type="number" step="any" value={formData.longitude} onChange={handleChange} className="w-full h-10 px-4 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none dir-ltr text-left text-slate-500 font-mono text-sm cursor-not-allowed" readOnly />
+                    <input name="longitude" type="number" step="any" value={formData.longitude} className="w-full h-10 px-4 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none dir-ltr text-left text-slate-500 font-mono text-sm cursor-not-allowed" readOnly />
                 </div>
             </div>
-        </div>
 
+            {/* 🗺️ استدعاء مكون الخريطة بتاعك كـ Popup */}
+            {showMap && (
+                <MapPicker 
+                    initialLat={formData.latitude} 
+                    initialLng={formData.longitude} 
+                    onClose={() => setShowMap(false)}
+                    onConfirm={(lat, lng) => {
+                        setFormData({...formData, latitude: lat, longitude: lng});
+                        setShowMap(false);
+                    }}
+                />
+            )}
+        </div>
+        
         {/* قسم: الصور والميديا */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
           <h3 className="font-black text-lg text-slate-800 border-b pb-4">الصور والميديا الرئيسية</h3>
