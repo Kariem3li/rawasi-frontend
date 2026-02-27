@@ -6,7 +6,9 @@ import { Loader2, ArrowLeft, UploadCloud, Image as ImageIcon, PlusCircle, X, Sea
 import api from "@/lib/axios";
 import axios from 'axios';
 import imageCompression from 'browser-image-compression';
-
+import dynamic from "next/dynamic";
+// الاستدعاء الديناميكي بيمنع إيرور الـ SSR في Next.js
+const MapPicker = dynamic(() => import("@/components/MapPicker"), { ssr: false });
 export default function AddPromotion() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -336,7 +338,7 @@ export default function AddPromotion() {
                 <div><label className="block text-xs font-bold text-slate-600 mb-1">رقم الواتساب</label><input name="whatsapp_number" value={formData.whatsapp_number} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-slate-100 focus:border-amber-500 outline-none dir-ltr text-right" /></div>
             </div>
         )}
-        {/* 📍 قسم: الموقع والخريطة (يظهر لكل أنواع الإعلانات) */}
+       {/* 📍 قسم: الموقع والخريطة (يظهر لكل أنواع الإعلانات) */}
         <div className="bg-blue-50/30 p-6 rounded-[2rem] shadow-sm border border-blue-100 space-y-4">
             <h3 className="font-black text-lg text-blue-800 border-b border-blue-100 pb-3 flex items-center gap-2"><MapPin className="w-5 h-5"/> الموقع الجغرافي</h3>
             
@@ -345,17 +347,28 @@ export default function AddPromotion() {
                 <input name="address" value={formData.address} onChange={handleChange} placeholder="مثال: التجمع الخامس، شارع التسعين الشمالي، بجوار..." className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none font-bold" />
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">خط العرض (Latitude)</label>
-                    <input name="latitude" type="number" step="any" value={formData.latitude} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none dir-ltr text-left" placeholder="مثال: 30.0444" />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">خط الطول (Longitude)</label>
-                    <input name="longitude" type="number" step="any" value={formData.longitude} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none dir-ltr text-left" placeholder="مثال: 31.2357" />
+            {/* 🗺️ الخريطة التفاعلية */}
+            <div className="space-y-2 pt-2">
+                <label className="block text-sm font-black text-blue-800 mb-2">حدد الموقع على الخريطة (اضغط على المكان لتعليق الدبوس 📍)</label>
+                <div className="border-4 border-white rounded-2xl overflow-hidden shadow-sm relative z-0">
+                     <MapPicker 
+                        lat={formData.latitude} 
+                        lng={formData.longitude} 
+                        onChange={(lat, lng) => setFormData({...formData, latitude: lat, longitude: lng})} 
+                     />
                 </div>
             </div>
-            <p className="text-[10px] text-slate-500 font-bold mt-1">💡 نصيحة: افتح خرائط جوجل، اضغط "كليك يمين" على موقع المشروع، وانسخ الأرقام (خط العرض ثم خط الطول).</p>
+
+            <div className="grid md:grid-cols-2 gap-4 pt-2">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">خط العرض (يتم تعبئته تلقائياً)</label>
+                    <input name="latitude" type="number" step="any" value={formData.latitude} onChange={handleChange} className="w-full h-10 px-4 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none dir-ltr text-left text-slate-500 font-mono text-sm cursor-not-allowed" readOnly />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">خط الطول (يتم تعبئته تلقائياً)</label>
+                    <input name="longitude" type="number" step="any" value={formData.longitude} onChange={handleChange} className="w-full h-10 px-4 rounded-xl border-2 border-slate-100 bg-slate-50 outline-none dir-ltr text-left text-slate-500 font-mono text-sm cursor-not-allowed" readOnly />
+                </div>
+            </div>
         </div>
 
         {/* قسم: الصور والميديا */}
