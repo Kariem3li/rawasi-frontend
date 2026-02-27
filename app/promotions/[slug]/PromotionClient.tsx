@@ -223,21 +223,44 @@ export default function PromotionClient({ promo }: { promo: any }) {
                     </div>
                 )}
 
-                {/* 📍 7. الخريطة (تم إصلاح الرابط) */}
-                {promo.latitude && promo.longitude && (
+                {/* 📍 7. الخريطة والعنوان النصي */}
+                {(promo.latitude && promo.longitude) || promo.address ? (
                     <div className="bg-white rounded-[2rem] shadow-sm p-6 border border-gray-100">
-                        <h3 className="font-black text-xl text-slate-900 mb-6 flex items-center gap-2"><MapPin className="w-6 h-6 text-blue-500"/> موقع المشروع</h3>
-                        <div className="h-64 md:h-80 w-full rounded-2xl overflow-hidden shadow-inner border border-gray-200">
-                            {/* ✅ إصلاح رابط خرائط جوجل هنا */}
-                            <iframe 
-                                title="Map" 
-                                width="100%" height="100%" frameBorder="0" scrolling="no" 
-                                src={`https://maps.google.com/maps?q=${promo.latitude},${promo.longitude}&hl=ar&z=15&output=embed`} 
-                                className="grayscale hover:grayscale-0 transition duration-700"
-                            ></iframe>
-                        </div>
+                        <h3 className="font-black text-xl text-slate-900 mb-6 flex items-center gap-2"><MapPin className="w-6 h-6 text-blue-500"/> موقع الإعلان</h3>
+                        
+                        {/* العنوان النصي */}
+                        {promo.address && (
+                            <div className="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-start gap-3">
+                                <MapPin className="w-6 h-6 text-slate-400 shrink-0" />
+                                <div>
+                                    <h4 className="text-xs font-bold text-slate-500 mb-1">العنوان التفصيلي</h4>
+                                    <p className="text-slate-800 font-bold">{promo.address}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* الخريطة التفاعلية */}
+                        {promo.latitude && promo.longitude && (
+                            <div className="h-64 md:h-80 w-full rounded-2xl overflow-hidden shadow-inner border border-gray-200 relative group">
+                                <iframe 
+                                    title="Map" 
+                                    width="100%" height="100%" frameBorder="0" scrolling="no" 
+                                    src={`https://maps.google.com/maps?q=${promo.latitude},${promo.longitude}&hl=ar&z=15&output=embed`} 
+                                    className="grayscale group-hover:grayscale-0 transition duration-700"
+                                ></iframe>
+                                {/* زرار فتح في جوجل ماب */}
+                                <a 
+                                    href={`https://www.google.com/maps/search/?api=1&query=${promo.latitude},${promo.longitude}`} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md text-slate-900 px-4 py-2 rounded-xl text-sm font-black shadow-lg hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-2"
+                                >
+                                    <MapPin className="w-4 h-4"/> فتح في خرائط جوجل
+                                </a>
+                            </div>
+                        )}
                     </div>
-                )}
+                ) : null}
             </div>
 
             {/* 🔍 Lightbox للصور المكبرة */}

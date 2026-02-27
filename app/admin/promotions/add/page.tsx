@@ -16,7 +16,8 @@ export default function AddPromotion() {
   const [formData, setFormData] = useState({
     title: "", subtitle: "", promo_type: "GENERAL", description: "",
     developer_name: "", payment_system: "", delivery_date: "", price_start_from: "", project_features: "",
-    phone_number: "", whatsapp_number: "", youtube_url: "", target_listing_id: ""
+    phone_number: "", whatsapp_number: "", youtube_url: "", target_listing_id: "",
+    address: "", latitude: "", longitude: ""
   });
 
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -335,7 +336,28 @@ export default function AddPromotion() {
                 <div><label className="block text-xs font-bold text-slate-600 mb-1">رقم الواتساب</label><input name="whatsapp_number" value={formData.whatsapp_number} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-slate-100 focus:border-amber-500 outline-none dir-ltr text-right" /></div>
             </div>
         )}
+        {/* 📍 قسم: الموقع والخريطة (يظهر لكل أنواع الإعلانات) */}
+        <div className="bg-blue-50/30 p-6 rounded-[2rem] shadow-sm border border-blue-100 space-y-4">
+            <h3 className="font-black text-lg text-blue-800 border-b border-blue-100 pb-3 flex items-center gap-2"><MapPin className="w-5 h-5"/> الموقع الجغرافي</h3>
+            
+            <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">العنوان النصي والتفصيلي (يظهر للعميل)</label>
+                <input name="address" value={formData.address} onChange={handleChange} placeholder="مثال: التجمع الخامس، شارع التسعين الشمالي، بجوار..." className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none font-bold" />
+            </div>
 
+            <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">خط العرض (Latitude)</label>
+                    <input name="latitude" type="number" step="any" value={formData.latitude} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none dir-ltr text-left" placeholder="مثال: 30.0444" />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">خط الطول (Longitude)</label>
+                    <input name="longitude" type="number" step="any" value={formData.longitude} onChange={handleChange} className="w-full h-12 px-4 rounded-xl border-2 border-white focus:border-blue-400 outline-none dir-ltr text-left" placeholder="مثال: 31.2357" />
+                </div>
+            </div>
+            <p className="text-[10px] text-slate-500 font-bold mt-1">💡 نصيحة: افتح خرائط جوجل، اضغط "كليك يمين" على موقع المشروع، وانسخ الأرقام (خط العرض ثم خط الطول).</p>
+        </div>
+        
         {/* قسم: الصور والميديا */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
           <h3 className="font-black text-lg text-slate-800 border-b pb-4">الصور والميديا الرئيسية</h3>
