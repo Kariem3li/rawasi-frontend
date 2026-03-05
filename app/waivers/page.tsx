@@ -5,7 +5,7 @@ import Navbar from "@/components/Navbar";
 import { 
     Search, MapPin, Building, FileText, 
     Award, Clock, Loader2, Sparkles, AlertCircle,
-    User, Phone, BellRing
+    User, Phone, BellRing , Calendar
 } from "lucide-react";
 
 export default function WaiversSearch() {
@@ -227,6 +227,14 @@ export default function WaiversSearch() {
                         <div>
                             <p className="text-[11px] text-slate-500 font-bold">رقم اللجنة</p>
                             <p className="text-lg font-black text-slate-800">{result.data.committee_number}</p>
+                        </div>
+                    </div>
+                    {/* 👈 كارت 3 الجديد: التاريخ */}
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                        <div className="bg-purple-50 p-3 rounded-xl"><Calendar className="w-6 h-6 text-purple-600" /></div>
+                        <div>
+                            <p className="text-[11px] text-slate-500 font-bold">تاريخ الإجراء</p>
+                            <p className="text-lg font-black text-slate-800">{result.data.date}</p>
                         </div>
                     </div>
                     <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 md:col-span-2 flex items-center gap-4">

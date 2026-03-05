@@ -95,7 +95,7 @@ function HomeContent() {
       <div className="w-full relative z-10 mt-2">
         <HeroSlider />
       </div>
-
+      
       {/* قسم البحث والفلاتر السريعة */}
       <div className="px-4 relative z-20 mt-6 space-y-4 max-w-7xl mx-auto">
         <div className="flex gap-3 items-center">
