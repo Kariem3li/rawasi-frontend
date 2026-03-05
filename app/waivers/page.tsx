@@ -2,12 +2,16 @@
 import api from "@/lib/axios";
 import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
-import BottomNav from "@/components/BottomNav"; // 👈 استدعاء البوتن ناف بار
+import BottomNav from "@/components/BottomNav"; 
 import { 
     Search, MapPin, Building, FileText, 
     Award, Clock, Loader2, Sparkles, AlertCircle,
-    User, Phone, BellRing, Calendar , Hourglass
+    User, Phone, BellRing, Calendar , Hourglass,
+    PhoneCall // 👈 استدعاء أيقونة الاتصال
 } from "lucide-react";
+
+// 👈 حط رقم شركتك هنا للتواصل
+const COMPANY_PHONE = "201000000000"; 
 
 export default function WaiversSearch() {
   const [formData, setFormData] = useState({ 
@@ -23,14 +27,12 @@ export default function WaiversSearch() {
 
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // 🚀 التعديل الأول: جلب بيانات العميل (الاسم والفون) مباشرة من السيرفر
   useEffect(() => {
     const fetchUserData = async () => {
         const token = localStorage.getItem("token") || sessionStorage.getItem("token");
         
         if (token) {
             try {
-                // لو مسجل دخول، هنجيب بياناته الأكيدة من الداتابيز
                 const { data } = await api.get('/auth/users/me/');
                 const fullName = (data.first_name || data.last_name) 
                     ? `${data.first_name} ${data.last_name}`.trim() 
@@ -39,13 +41,12 @@ export default function WaiversSearch() {
                 setFormData(prev => ({ 
                     ...prev, 
                     full_name: fullName || "", 
-                    phone_number: data.phone_number || "" // 👈 السيرفر هيرجع الرقم هنا
+                    phone_number: data.phone_number || "" 
                 }));
             } catch (error) {
                 console.error("فشل جلب بيانات المستخدم", error);
             }
         } else {
-            // لو مش مسجل، نحاول نقرأ أي بيانات قديمة من المتصفح
             const savedName = localStorage.getItem("username") || sessionStorage.getItem("username");
             const savedPhone = localStorage.getItem("remembered_phone");
             if (savedName) {
@@ -93,7 +94,6 @@ export default function WaiversSearch() {
   };
 
   return (
-    // 👈 التعديل التاني: ضفنا pb-24 عشان نعمل مساحة للمنيو السفلية
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans dir-rtl relative overflow-hidden pb-24 md:pb-0">
       <Navbar />
 
@@ -116,15 +116,44 @@ export default function WaiversSearch() {
         </div>
 
         <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-xl p-6 md:p-8 w-full border border-white/50 animate-in zoom-in-95 duration-500 mb-8">
-            <div className="bg-blue-50/50 border border-blue-100 p-4 md:p-5 rounded-2xl flex items-start gap-4 mb-8 shadow-sm">
-                <div className="bg-white p-2.5 rounded-xl shadow-sm shrink-0 border border-blue-50">
-                    <BellRing className="w-6 h-6 text-blue-500 animate-pulse" />
+            
+            {/* 🚀 الكارت الأزرق بعد التعديل ودمج أزرار التواصل */}
+            <div className="bg-blue-50/50 border border-blue-100 p-5 md:p-6 rounded-2xl mb-8 shadow-sm flex flex-col gap-4">
+                <div className="flex items-start gap-4">
+                    <div className="bg-white p-2.5 rounded-xl shadow-sm shrink-0 border border-blue-50">
+                        <BellRing className="w-6 h-6 text-blue-500 animate-pulse" />
+                    </div>
+                    <div>
+                        <h4 className="text-sm md:text-base font-black text-slate-800 mb-1">لماذا نطلب بياناتك؟</h4>
+                        <p className="text-xs md:text-sm text-slate-600 font-bold leading-relaxed">
+                            يرجى التأكد من كتابة الاسم ورقم الهاتف بشكل صحيح، حيث سيقوم نظامنا بإرسال رسالة فورية لك عبر الواتساب أو اتصال هاتفي لتبليغك <span className="text-blue-600 font-black">بمجرد صدور الموافقة على التنازل الخاص بك!</span>
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h4 className="text-sm md:text-base font-black text-slate-800 mb-1">لماذا نطلب بياناتك؟</h4>
-                    <p className="text-xs md:text-sm text-slate-600 font-bold leading-relaxed">
-                        يرجى التأكد من كتابة الاسم ورقم الهاتف بشكل صحيح، حيث سيقوم نظامنا بإرسال رسالة فورية لك عبر الواتساب أو اتصال هاتفي لتبليغك <span className="text-blue-600 font-black">بمجرد صدور الموافقة على التنازل الخاص بك!</span>
+
+                {/* قسم التواصل داخل الكارت */}
+                <div className="pt-4 border-t border-blue-100/50 mt-1">
+                    <p className="text-xs font-bold text-slate-500 mb-3 text-center md:text-right">
+                        لأي استفسار أو مساعدة في الإجراءات، يسعدنا تواصلك معنا مباشرة:
                     </p>
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                        <a 
+                            href={`https://wa.me/${COMPANY_PHONE}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 bg-[#25D366] text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md hover:bg-[#20bd5a] hover:-translate-y-0.5 transition-all"
+                        >
+                            <WhatsAppIcon className="w-4 h-4" />
+                            تواصل واتساب
+                        </a>
+                        <a 
+                            href={`tel:+${COMPANY_PHONE}`} 
+                            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md hover:bg-blue-700 hover:-translate-y-0.5 transition-all"
+                        >
+                            <PhoneCall className="w-4 h-4" />
+                            اتصال هاتفي
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -303,10 +332,8 @@ export default function WaiversSearch() {
                 </div>
             )}
         </div>
-
       </div>
 
-      {/* 👈 التعديل التالت: إضافة البوتن ناف بار أسفل الصفحة */}
       <BottomNav />
     </main>
   );
@@ -315,5 +342,11 @@ export default function WaiversSearch() {
 function CheckCircleIcon(props: any) {
   return (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+  )
+}
+
+function WhatsAppIcon(props: any) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
   )
 }
