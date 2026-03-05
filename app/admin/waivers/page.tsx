@@ -70,6 +70,17 @@ export default function AdminWaivers() {
             setDownloading(false);
         }
     };
+    // 👈 دالة مسح كل التنازلات المرفوعة
+    const handleDeleteAllWaivers = async () => {
+        if (!confirm("🚨 تحذير: هل أنت متأكد من مسح جميع بيانات الإكسيل (التنازلات) من قاعدة البيانات؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+        
+        try {
+            const res = await api.delete('/admin-dashboard/waivers/delete-all/');
+            alert(res.data.message);
+        } catch (err) {
+            alert("حدث خطأ أثناء محاولة مسح البيانات.");
+        }
+    };
 
     // 👈 دالة الحذف
     const handleDeleteLead = async (id: number) => {
@@ -91,10 +102,21 @@ export default function AdminWaivers() {
 
             <div className="grid md:grid-cols-2 gap-8 mb-10">
                 {/* 📤 قسم رفع ملف التنازلات */}
-                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="bg-blue-50 p-3 rounded-xl"><UploadCloud className="w-6 h-6 text-blue-500" /></div>
-                        <h2 className="text-xl font-black text-slate-800">رفع إكسيل التنازلات</h2>
+                <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-50 p-3 rounded-xl"><UploadCloud className="w-6 h-6 text-blue-500" /></div>
+                            <h2 className="text-xl font-black text-slate-800">رفع إكسيل التنازلات</h2>
+                        </div>
+                        
+                        {/* 👈 الزرار الأحمر الجديد لمسح الإكسيل القديم */}
+                        <button 
+                            onClick={handleDeleteAllWaivers}
+                            title="مسح جميع التنازلات القديمة"
+                            className="p-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
                     </div>
 
                     <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors">
