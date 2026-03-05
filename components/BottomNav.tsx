@@ -9,7 +9,8 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   
-  const [active, setActive] = useState(0);
+  // 👈 خليت الحالة الافتراضية null بدل 0 (عشان منورش الرئيسية بالغلط)
+  const [active, setActive] = useState<number | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -23,9 +24,17 @@ export default function BottomNav() {
     { name: "حسابي", href: "/profile", icon: User, protected: true },
   ], []);
 
+  // 👈 دالة التحديد بقت أذكى
   useEffect(() => {
-    const index = Menus.findIndex((item) => item.href === pathname);
-    if (index !== -1) setActive(index);
+    const index = Menus.findIndex((item) => {
+        // الرئيسية لازم تطابق 100%
+        if (item.href === '/') return pathname === '/';
+        // باقي الصفحات ممكن تطابق البداية (زي /profile/settings)
+        return pathname.startsWith(item.href);
+    });
+    
+    // لو لقاها هينورها، لو ملقاهاش هيفصل النور خالص (زي صفحة /waivers)
+    setActive(index !== -1 ? index : null);
   }, [pathname, Menus]);
 
   useEffect(() => {
@@ -38,7 +47,6 @@ export default function BottomNav() {
 
   const handleNavClick = (e: React.MouseEvent, index: number, menu: any) => {
     if (menu.protected) {
-        // فحص التوكن في كلا الذاكرتين
         const token = localStorage.getItem("token") || sessionStorage.getItem("token");
         
         if (!token) {
@@ -58,14 +66,18 @@ export default function BottomNav() {
 
   if (!mounted) return null;
 
-  // الحسابات الرياضية للمنحنى السائل
+  // 👈 لو مش active على حاجة (زي صفحة التنازلات)، هنوقف حسابات المنحنى
+  const isAnyActive = active !== null;
+  const safeActive = active ?? 0; // للحسابات فقط عشان مديش إيرور
+
   const itemWidth = windowWidth / 5;
-  const center = (4 - active) * itemWidth + (itemWidth / 2);
+  const center = (4 - safeActive) * itemWidth + (itemWidth / 2);
   const curveWidth = 75; 
   const depth = 38;      
   const R = 30;          
 
-  const path = `
+  // 👈 لو مفيش حاجة منورة، هنرسم مستطيل سادة بدون منحنى
+  const path = isAnyActive ? `
     M0,${R}                         
     Q0,0 ${R},0                     
     L${center - curveWidth},0       
@@ -76,11 +88,18 @@ export default function BottomNav() {
     L${windowWidth},80              
     L0,80                           
     Z                               
+  ` : `
+    M0,${R}                         
+    Q0,0 ${R},0
+    L${windowWidth - R},0           
+    Q${windowWidth},0 ${windowWidth},${R} 
+    L${windowWidth},80              
+    L0,80                           
+    Z
   `;
 
   return (
     <>
-        {/* الحاوية الرئيسية مختفية في الديسك توب */}
         <div className="md:hidden fixed bottom-0 w-full z-40 drop-shadow-[0_-8px_20px_rgba(0,0,0,0.05)] animate-in slide-in-from-bottom-5 duration-500" dir="rtl">
         
         <svg 
@@ -97,17 +116,19 @@ export default function BottomNav() {
         </svg>
 
         <div className="absolute top-0 left-0 w-full h-full">
-            {/* ✅ الدائرة الطائرة المحسنة (اللون الذهبي مع توهج) */}
+            {/* ✅ إخفاء الدائرة لو مفيش عنصر منور */}
             <div 
-                className="absolute -top-[24px] w-14 h-14 rounded-full flex justify-center items-center z-20 bg-amber-500 shadow-lg shadow-amber-500/40 border-[3px] border-white"
+                className={`absolute -top-[24px] w-14 h-14 rounded-full flex justify-center items-center z-20 bg-amber-500 shadow-lg shadow-amber-500/40 border-[3px] border-white transition-all duration-500 ${isAnyActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0 pointer-events-none'}`}
                 style={{
                     left: `${center - 28}px`, 
-                    transition: "left 0.5s cubic-bezier(0.5, 0, 0.1, 1.1)",
+                    transition: "left 0.5s cubic-bezier(0.5, 0, 0.1, 1.1), opacity 0.3s, transform 0.3s",
                 }}
             >
-                <span className="text-slate-900 animate-in zoom-in duration-300 transform scale-110">
-                    {React.createElement(Menus[active].icon, { size: 24, strokeWidth: 2.5 })}
-                </span>
+                {isAnyActive && (
+                    <span className="text-slate-900 animate-in zoom-in duration-300 transform scale-110">
+                        {React.createElement(Menus[safeActive].icon, { size: 24, strokeWidth: 2.5 })}
+                    </span>
+                )}
             </div>
 
             <ul className="flex w-full h-full absolute top-0 right-0">
@@ -120,7 +141,6 @@ export default function BottomNav() {
                         className="flex flex-col items-center justify-center h-full w-full cursor-pointer pb-1"
                         onClick={(e) => handleNavClick(e, i, menu)}
                     >
-                    {/* الأيقونة وهي غير نشطة */}
                     <span
                         className={`absolute top-6 transition-all duration-500 ease-out
                         ${isActive 
@@ -131,7 +151,6 @@ export default function BottomNav() {
                         <menu.icon size={26} strokeWidth={1.5} />
                     </span>
 
-                    {/* النص وهو نشط */}
                     <span
                         className={`absolute bottom-3 text-[11px] font-black transition-all duration-500 ease-out
                         ${isActive 
@@ -149,7 +168,6 @@ export default function BottomNav() {
         </div>
         </div>
 
-        {/* ✅ المودال الفخم الموحد مع Navbar */}
         {showAuthModal && (
             <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4">
                 <div 
