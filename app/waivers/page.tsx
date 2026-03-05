@@ -2,6 +2,7 @@
 import api from "@/lib/axios";
 import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav"; // 👈 استدعاء البوتن ناف بار
 import { 
     Search, MapPin, Building, FileText, 
     Award, Clock, Loader2, Sparkles, AlertCircle,
@@ -20,24 +21,47 @@ export default function WaiversSearch() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  // 👈 1. السحر الجديد: مرجع (Ref) عشان نعمل سكرول للنتيجة
   const resultRef = useRef<HTMLDivElement>(null);
 
+  // 🚀 التعديل الأول: جلب بيانات العميل (الاسم والفون) مباشرة من السيرفر
   useEffect(() => {
-    const savedName = localStorage.getItem("username") || sessionStorage.getItem("username");
-    const savedPhone = localStorage.getItem("remembered_phone");
-    if (savedName) {
-        setFormData(prev => ({ ...prev, full_name: savedName, phone_number: savedPhone || "" }));
-    }
+    const fetchUserData = async () => {
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        
+        if (token) {
+            try {
+                // لو مسجل دخول، هنجيب بياناته الأكيدة من الداتابيز
+                const { data } = await api.get('/auth/users/me/');
+                const fullName = (data.first_name || data.last_name) 
+                    ? `${data.first_name} ${data.last_name}`.trim() 
+                    : data.username;
+
+                setFormData(prev => ({ 
+                    ...prev, 
+                    full_name: fullName || "", 
+                    phone_number: data.phone_number || "" // 👈 السيرفر هيرجع الرقم هنا
+                }));
+            } catch (error) {
+                console.error("فشل جلب بيانات المستخدم", error);
+            }
+        } else {
+            // لو مش مسجل، نحاول نقرأ أي بيانات قديمة من المتصفح
+            const savedName = localStorage.getItem("username") || sessionStorage.getItem("username");
+            const savedPhone = localStorage.getItem("remembered_phone");
+            if (savedName) {
+                setFormData(prev => ({ ...prev, full_name: savedName, phone_number: savedPhone || "" }));
+            }
+        }
+    };
+
+    fetchUserData();
   }, []);
 
-  // 👈 2. أول ما النتيجة تتغير (تظهر)، الصفحة هتعمل سكرول ناعم ليها
   useEffect(() => {
     if (result && resultRef.current) {
         resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [result]);
-
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +93,8 @@ export default function WaiversSearch() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans dir-rtl relative overflow-hidden">
+    // 👈 التعديل التاني: ضفنا pb-24 عشان نعمل مساحة للمنيو السفلية
+    <main className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans dir-rtl relative overflow-hidden pb-24 md:pb-0">
       <Navbar />
 
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
@@ -186,7 +211,6 @@ export default function WaiversSearch() {
             </form>
         </div>
 
-        {/* 👈 3. ربطنا الديف ده بالـ Ref عشان نعمل سكرول ليه */}
         <div ref={resultRef} className="w-full">
             {result?.status === 'success' && (
                 <div className="w-full bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-[2rem] p-6 md:p-10 shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-500 relative overflow-hidden">
@@ -201,7 +225,6 @@ export default function WaiversSearch() {
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">
-                        {/* 👈 4. الديزاين الجديد الاحترافي للقطعة والحي والمجاورة */}
                         <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:col-span-2">
                             <p className="text-xs text-slate-500 font-bold mb-3 flex items-center gap-2">
                                 <MapPin className="w-4 h-4" /> بيانات القطعة
@@ -251,16 +274,13 @@ export default function WaiversSearch() {
 
             {result?.status === 'pending' && (
                 <div className="w-full bg-gradient-to-br from-rose-50 to-red-50 border-2 border-rose-200 rounded-[2rem] p-6 md:p-10 shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-500 relative overflow-hidden">
-                    {/* 🔴 خط متحرك فوق زي بتاع النجاح بس أحمر */}
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 via-rose-400 to-red-400 animate-pulse"></div>
 
                     <div className="flex flex-col items-center text-center">
-                        {/* ⏳ أنيميشن الساعة الرملية بتلف */}
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-5 border-4 border-rose-100 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
                             <Hourglass className="w-10 h-10 text-rose-500 animate-[spin_3s_linear_infinite]" />
                         </div>
                         
-                        {/* 🥺 رسالة شخصية لطيفة */}
                         <h2 className="text-2xl font-black text-rose-800 mb-2">
                             لسه شوية يا {formData.full_name.split(' ')[0]} 🥺
                         </h2>
@@ -269,14 +289,12 @@ export default function WaiversSearch() {
                             لم يتم تسجيل إجراءات التنازل لهذه القطعة حتى الآن. فريقنا يتابع الإجراءات في الجهاز بشكل مستمر. 
                         </p>
 
-                        {/* 📱 تأكيد التواصل */}
                         <div className="mt-4 bg-white/60 px-5 py-3 rounded-xl border border-rose-100 shadow-sm">
                             <span className="text-red-700 font-black text-sm block">
                                 سنقوم بالتواصل معك على رقمك ({formData.phone_number}) فور صدور الموافقة! 🚀
                             </span>
                         </div>
                         
-                        {/* 💡 تنبيه خفيف */}
                         <div className="mt-6 flex items-center justify-center gap-2 text-rose-500 text-xs font-bold">
                             <AlertCircle className="w-4 h-4 shrink-0" />
                             تأكد من إدخال رقم القطعة والحي بشكل صحيح، أو عاود الاستعلام لاحقاً.
@@ -287,6 +305,9 @@ export default function WaiversSearch() {
         </div>
 
       </div>
+
+      {/* 👈 التعديل التالت: إضافة البوتن ناف بار أسفل الصفحة */}
+      <BottomNav />
     </main>
   );
 }
