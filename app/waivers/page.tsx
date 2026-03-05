@@ -1,5 +1,5 @@
 "use client";
-
+import api from "@/lib/axios";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { 
@@ -36,32 +36,40 @@ export default function WaiversSearch() {
     }
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.full_name || !formData.phone_number || !formData.plot || !formData.neighborhood || !formData.district) return;
 
     setLoading(true);
     setResult(null);
 
-    // محاكاة الاتصال بالسيرفر
-    setTimeout(() => {
-        if (formData.plot === "123") {
+    try {
+        const res = await api.post('/waivers/search/', {
+            full_name: formData.full_name,
+            phone_number: formData.phone_number,
+            plot: formData.plot,
+            neighborhood: formData.neighborhood,
+            district: formData.district
+        });
+
+        // لو السيرفر لقى التنازل
+        if (res.data.status === 'success') {
             setResult({
                 status: 'success',
-                data: {
-                    plot: formData.plot,
-                    neighborhood: formData.neighborhood,
-                    district: formData.district,
-                    procedure: "تمت الموافقة النهائية واستخراج العقد",
-                    committee_number: "لجنة رقم 45 - لسنة 2026",
-                    date: new Date().toLocaleDateString('ar-EG')
-                }
+                data: res.data.data
             });
-        } else {
+        } 
+        // لو ملقاهوش (وسجل بيانات العميل)
+        else {
             setResult({ status: 'pending' });
         }
+    } catch (error: any) {
+        console.error("Search error", error);
+        alert("حدث خطأ في الاتصال، يرجى التأكد من البيانات والمحاولة لاحقاً.");
+    } finally {
         setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
