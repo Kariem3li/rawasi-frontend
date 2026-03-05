@@ -9,8 +9,6 @@ import { BASE_URL } from "@/lib/config";
 import { Logo } from "./logo"; 
 import api from "@/lib/axios"; 
 
-const ADMIN_URL = `${BASE_URL}/admin/`; 
-
 export default function Navbar() {
   const router = useRouter(); 
   const pathname = usePathname();
@@ -78,7 +76,7 @@ export default function Navbar() {
           setIsLoggedIn(false);
           setUsername("");
           setIsAdmin(false);
-          router.push("/login"); // ✅ استخدام روتر Next.js لسرعة التنقل
+          router.push("/login"); 
       }
   };
 
@@ -110,7 +108,7 @@ export default function Navbar() {
                <Logo isWhite={false} className="h-10 w-auto hover:scale-105 transition-transform" />
             </Link>
 
-            {/* 2. روابط الديسك توب (في المنتصف - تظهر فقط على الشاشات الكبيرة) */}
+            {/* 2. روابط الديسك توب */}
             <div className="hidden md:flex items-center gap-8">
                 <Link href="/" className={`font-bold text-sm transition-colors ${pathname === '/' ? 'text-amber-500' : 'text-slate-600 hover:text-amber-500'}`}>
                     الرئيسية
@@ -126,6 +124,16 @@ export default function Navbar() {
             {/* 3. الإجراءات والبروفايل (يسار) */}
             <div className="flex items-center gap-3 md:gap-4 relative z-[901]">
               
+              {/* 🚀 السحر الأول: زر الإدارة للديسك توب (يظهر للأدمن فقط) */}
+              {isAdmin && (
+                  <Link 
+                    href="/admin" 
+                    className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-sm font-black shadow-lg shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all border border-slate-700"
+                  >
+                      <ShieldAlert className="w-4 h-4 text-amber-500"/> الإدارة
+                  </Link>
+              )}
+
               {/* زر أضف عقار للشاشات الكبيرة */}
               <button 
                 onClick={(e) => handleProtectedClick(e, '/add-property')}
@@ -158,7 +166,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* مساحة فارغة لتعويض الـ Fixed Navbar */}
       <div className="h-[75px] w-full bg-transparent block"></div>
 
       {/* ✅ القائمة الجانبية (للموبايل فقط) */}
@@ -195,10 +202,11 @@ export default function Navbar() {
                 </Link>
               )}
 
+              {/* 🚀 السحر التاني: زر الموبايل يودي على الداش بورد الشيك اللي عملناها */}
               {isAdmin && (
-                <a href={ADMIN_URL} target="_blank" rel="noopener noreferrer" className="mb-4 bg-gradient-to-r from-red-600 to-red-500 text-white p-3.5 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg shadow-red-500/20 hover:scale-[1.02] transition-transform shrink-0">
-                    <ShieldAlert className="w-5 h-5"/> لوحة الإدارة
-                </a>
+                <Link href="/admin" onClick={() => setIsSidebarOpen(false)} className="mb-4 bg-slate-900 text-white p-3.5 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm shadow-lg shadow-slate-900/20 hover:scale-[1.02] transition-transform shrink-0 border border-slate-700">
+                    <ShieldAlert className="w-5 h-5 text-amber-500"/> لوحة الإدارة
+                </Link>
               )}
 
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2 mb-4">
