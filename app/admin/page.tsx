@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Building, Users, MousePointerClick, Loader2, FileText, ArrowLeft } from "lucide-react";
+import { 
+  BarChart3, Building, Users, MousePointerClick, 
+  Loader2, FileText, ArrowLeft, UserCheck 
+} from "lucide-react";
 import api from "@/lib/axios";
 
 export default function AdminOverview() {
@@ -11,6 +14,7 @@ export default function AdminOverview() {
     total_users: 0,
     total_views: 0,
     total_clicks: 0,
+    total_waiver_leads: 0, // 👈 ضفنا المتغير الجديد هنا
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +42,6 @@ export default function AdminOverview() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h2 className="text-2xl font-black text-slate-800">نظرة عامة وإحصائيات</h2>
           
-          {/* 🚀 الزرار الجديد الشيك للتنازلات */}
           <Link 
             href="/admin/waivers" 
             className="bg-slate-900 text-white px-6 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-slate-900 transition-all shadow-lg active:scale-95 border border-slate-800"
@@ -54,9 +57,11 @@ export default function AdminOverview() {
           <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+        // 👈 خلينا الشبكة هنا تاخد 5 مربعات عشان تستوعب المربع الجديد
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
           {[
             { title: "إجمالي العقارات", value: stats.total_listings, icon: Building, color: "bg-blue-500" },
+            { title: "عملاء الاستعلام (Leads)", value: stats.total_waiver_leads || 0, icon: UserCheck, color: "bg-teal-500" }, // 👈 المربع الجديد بتاعنا
             { title: "المستخدمين النشطين", value: stats.total_users, icon: Users, color: "bg-emerald-500" },
             { title: "الزيارات الكلية", value: stats.total_views, icon: BarChart3, color: "bg-purple-500" },
             { title: "نقرات التواصل", value: stats.total_clicks, icon: MousePointerClick, color: "bg-amber-500" },
@@ -68,7 +73,7 @@ export default function AdminOverview() {
               <div>
                 <p className="text-xs md:text-sm font-bold text-slate-500 mb-1">{stat.title}</p>
                 <h3 className="text-xl md:text-2xl font-black text-slate-800">
-                  {stat.value.toLocaleString('ar-EG')}
+                  {stat.value ? stat.value.toLocaleString('ar-EG') : 0}
                 </h3>
               </div>
             </div>
@@ -76,7 +81,7 @@ export default function AdminOverview() {
         </div>
       )}
 
-      {/* 📝 رسالة الترحيب المحدثة */}
+      {/* 📝 رسالة الترحيب */}
       <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
         <h3 className="font-black text-lg md:text-xl text-slate-800 mb-3">مرحباً بك في لوحة التحكم المركزية 🚀</h3>
