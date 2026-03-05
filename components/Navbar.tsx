@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { User, LogIn, Menu, X, LogOut, Home, PlusSquare, ShieldAlert, Building2, Heart } from "lucide-react"; 
+import { User, LogIn, Menu, X, LogOut, Home, PlusSquare, ShieldAlert, Building2, Heart, FileSearch } from "lucide-react"; // 👈 ضفنا FileSearch
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation"; 
 import NotificationBell from "./NotificationBell";
@@ -119,6 +119,10 @@ export default function Navbar() {
                 <button onClick={(e) => handleProtectedClick(e, '/saved')} className={`font-bold text-sm transition-colors ${pathname === '/saved' ? 'text-amber-500' : 'text-slate-600 hover:text-amber-500'}`}>
                     المفضلة
                 </button>
+                {/* 🚀 اللينك الجديد بتاع التنازلات */}
+                <Link href="/waivers" className={`font-bold text-sm flex items-center gap-1.5 transition-colors ${pathname === '/waivers' ? 'text-amber-500' : 'text-slate-600 hover:text-amber-500'}`}>
+                    <FileSearch className="w-4 h-4" /> التنازلات
+                </Link>
             </div>
 
             {/* 3. الإجراءات والبروفايل (يسار) */}
@@ -222,7 +226,10 @@ export default function Navbar() {
                   <button onClick={(e) => handleProtectedClick(e, '/add-property')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-amber-50 text-amber-600 font-bold hover:bg-amber-500 hover:text-slate-900 transition-all duration-300">
                       <PlusSquare className="w-5 h-5"/> أضف عقار
                   </button>
-                  
+                  {/* 🚀 الزرار الجديد في الموبايل */}
+                  <Link href="/waivers" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-blue-50 text-blue-700 font-bold hover:bg-blue-600 hover:text-white transition-all duration-300 border border-blue-100/50">
+                      <FileSearch className="w-5 h-5"/> الاستعلام عن التنازلات
+                  </Link>
                   {!isLoggedIn && (
                     <Link href="/login" className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-all duration-300 mt-6 shadow-md" onClick={() => setIsSidebarOpen(false)}>
                         <LogIn className="w-5 h-5"/> تسجيل الدخول
