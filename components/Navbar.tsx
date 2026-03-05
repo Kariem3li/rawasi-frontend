@@ -241,17 +241,35 @@ export default function Navbar() {
       </div>
 
       {/* ✅ مودال تسجيل الدخول (للحماية) */}
+      {/* ✅ مودال تسجيل الدخول (متسنتر في نص الشاشة بالظبط) */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowAuthModal(false)}></div>
-            <div className="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl relative z-10 animate-in zoom-in duration-300 border border-gray-100">
-                <button onClick={() => setShowAuthModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-red-500 transition bg-gray-50 p-1.5 rounded-full"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-[99999]">
+            {/* 1. الخلفية الشفافة (الضبابية) */}
+            <div 
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                onClick={() => setShowAuthModal(false)}
+            ></div>
+            
+            {/* 2. مربع الرسالة (متسنتر بالمقاسات المطلقة) */}
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-[2rem] p-8 w-[90%] max-w-sm shadow-2xl z-10 animate-in zoom-in duration-300 border border-gray-100">
+                
+                {/* زرار الإغلاق */}
+                <button 
+                    onClick={() => setShowAuthModal(false)} 
+                    className="absolute top-5 right-5 text-gray-400 hover:text-red-500 transition bg-gray-50 p-1.5 rounded-full"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+                
+                {/* محتوى الرسالة */}
                 <div className="text-center mt-2">
                     <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5 text-amber-600 shadow-inner">
                         <LogIn className="w-8 h-8 ml-1" />
                     </div>
                     <h3 className="text-xl font-black text-slate-900 mb-2">تسجيل الدخول مطلوب</h3>
                     <p className="text-gray-500 text-sm mb-8 leading-relaxed">للمتابعة واستخدام هذه الميزة، يرجى تسجيل الدخول إلى حسابك أو إنشاء حساب جديد.</p>
+                    
+                    {/* الأزرار */}
                     <div className="flex gap-3">
                         <button onClick={handleLoginRedirect} className="flex-1 bg-amber-500 text-slate-900 font-black py-3.5 rounded-xl hover:bg-amber-400 transition shadow-lg shadow-amber-500/20 active:scale-95">دخول</button>
                         <button onClick={() => setShowAuthModal(false)} className="flex-1 bg-gray-100 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-gray-200 transition active:scale-95">إلغاء</button>
