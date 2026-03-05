@@ -1,11 +1,11 @@
 "use client";
 import api from "@/lib/axios";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
 import { 
     Search, MapPin, Building, FileText, 
     Award, Clock, Loader2, Sparkles, AlertCircle,
-    User, Phone, BellRing , Calendar
+    User, Phone, BellRing, Calendar , Hourglass
 } from "lucide-react";
 
 export default function WaiversSearch() {
@@ -20,21 +20,23 @@ export default function WaiversSearch() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  // 🚀 السحر الأول: سحب بيانات العميل لو مسجل دخول
+  // 👈 1. السحر الجديد: مرجع (Ref) عشان نعمل سكرول للنتيجة
+  const resultRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    // بنقرا البيانات اللي حفظناها في صفحة اللوجين
     const savedName = localStorage.getItem("username") || sessionStorage.getItem("username");
     const savedPhone = localStorage.getItem("remembered_phone");
-
     if (savedName) {
-        setFormData(prev => ({
-            ...prev,
-            full_name: savedName,
-            // لو مفيش رقم محفوظ، هنسيبها فاضية يكتبها
-            phone_number: savedPhone || ""
-        }));
+        setFormData(prev => ({ ...prev, full_name: savedName, phone_number: savedPhone || "" }));
     }
   }, []);
+
+  // 👈 2. أول ما النتيجة تتغير (تظهر)، الصفحة هتعمل سكرول ناعم ليها
+  useEffect(() => {
+    if (result && resultRef.current) {
+        resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [result]);
 
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -53,15 +55,9 @@ export default function WaiversSearch() {
             district: formData.district
         });
 
-        // لو السيرفر لقى التنازل
         if (res.data.status === 'success') {
-            setResult({
-                status: 'success',
-                data: res.data.data
-            });
-        } 
-        // لو ملقاهوش (وسجل بيانات العميل)
-        else {
+            setResult({ status: 'success', data: res.data.data });
+        } else {
             setResult({ status: 'pending' });
         }
     } catch (error: any) {
@@ -76,7 +72,6 @@ export default function WaiversSearch() {
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans dir-rtl relative overflow-hidden">
       <Navbar />
 
-      {/* خلفية جمالية */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-[100px] opacity-40"></div>
           <div className="absolute top-40 -left-40 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-[100px] opacity-40"></div>
@@ -95,10 +90,7 @@ export default function WaiversSearch() {
             <p className="text-slate-500 font-bold md:text-lg">تابع حالة ملفك وإجراءات التنازل بكل سهولة</p>
         </div>
 
-        {/* 🔍 فورم البحث */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-xl p-6 md:p-8 w-full border border-white/50 animate-in zoom-in-95 duration-500">
-            
-            {/* 💡 الرسالة الذكية للعميل */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] shadow-xl p-6 md:p-8 w-full border border-white/50 animate-in zoom-in-95 duration-500 mb-8">
             <div className="bg-blue-50/50 border border-blue-100 p-4 md:p-5 rounded-2xl flex items-start gap-4 mb-8 shadow-sm">
                 <div className="bg-white p-2.5 rounded-xl shadow-sm shrink-0 border border-blue-50">
                     <BellRing className="w-6 h-6 text-blue-500 animate-pulse" />
@@ -112,8 +104,6 @@ export default function WaiversSearch() {
             </div>
 
             <form onSubmit={handleSearch}>
-                
-                {/* 👤 قسم البيانات الشخصية */}
                 <div className="grid md:grid-cols-2 gap-5 mb-6 pb-6 border-b border-gray-100">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">الاسم الرباعي</label>
@@ -128,7 +118,6 @@ export default function WaiversSearch() {
                             />
                         </div>
                     </div>
-
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">رقم الهاتف (للتواصل السريع)</label>
                         <div className="relative">
@@ -144,7 +133,6 @@ export default function WaiversSearch() {
                     </div>
                 </div>
 
-                {/* 📍 قسم بيانات القطعة */}
                 <div className="grid md:grid-cols-3 gap-5">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">الحي</label>
@@ -159,7 +147,6 @@ export default function WaiversSearch() {
                             />
                         </div>
                     </div>
-
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">المجاورة</label>
                         <div className="relative">
@@ -173,7 +160,6 @@ export default function WaiversSearch() {
                             />
                         </div>
                     </div>
-
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">رقم القطعة</label>
                         <div className="relative">
@@ -187,7 +173,6 @@ export default function WaiversSearch() {
                             />
                         </div>
                     </div>
-
                     <div className="md:col-span-3 mt-2">
                         <button 
                             type="submit" 
@@ -201,72 +186,105 @@ export default function WaiversSearch() {
             </form>
         </div>
 
-        {/* باقي الكود بتاع النتيجة (مبروك أو جاري الانتظار) زي ما هو بالظبط */}
-        {result?.status === 'success' && (
-            <div className="mt-8 w-full bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-[2rem] p-6 md:p-10 shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-500 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400 animate-pulse"></div>
-                
-                <div className="flex flex-col items-center text-center mb-8">
-                    <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)] animate-bounce">
-                        <Sparkles className="w-8 h-8 text-white" />
-                    </div>
-                    <h2 className="text-3xl font-black text-emerald-800 mb-2">ألف مبروك يا {formData.full_name.split(' ')[0]}! 🎉</h2>
-                    <p className="text-emerald-600 font-bold">تم إنهاء إجراءات التنازل بنجاح للقطعة الخاصة بك.</p>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
-                        <div className="bg-emerald-50 p-3 rounded-xl"><FileText className="w-6 h-6 text-emerald-600" /></div>
-                        <div>
-                            <p className="text-[11px] text-slate-500 font-bold">رقم القطعة / الحي / المجاورة</p>
-                            <p className="text-lg font-black text-slate-800">{result.data.plot} / {result.data.district} / {result.data.neighborhood}</p>
-                        </div>
-                    </div>
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
-                        <div className="bg-amber-50 p-3 rounded-xl"><Award className="w-6 h-6 text-amber-600" /></div>
-                        <div>
-                            <p className="text-[11px] text-slate-500 font-bold">رقم اللجنة</p>
-                            <p className="text-lg font-black text-slate-800">{result.data.committee_number}</p>
-                        </div>
-                    </div>
-                    {/* 👈 كارت 3 الجديد: التاريخ */}
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
-                        <div className="bg-purple-50 p-3 rounded-xl"><Calendar className="w-6 h-6 text-purple-600" /></div>
-                        <div>
-                            <p className="text-[11px] text-slate-500 font-bold">تاريخ الإجراء</p>
-                            <p className="text-lg font-black text-slate-800">{result.data.date}</p>
-                        </div>
-                    </div>
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 md:col-span-2 flex items-center gap-4">
-                        <div className="bg-blue-50 p-3 rounded-xl"><CheckCircleIcon className="w-6 h-6 text-blue-600" /></div>
-                        <div>
-                            <p className="text-[11px] text-slate-500 font-bold">الإجراء الذي تم</p>
-                            <p className="text-lg font-black text-slate-800">{result.data.procedure}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {result?.status === 'pending' && (
-            <div className="mt-8 w-full bg-white border-2 border-slate-100 rounded-[2rem] p-6 md:p-10 shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-500">
-                <div className="flex flex-col items-center text-center">
-                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-5 border-4 border-slate-100">
-                        <Clock className="w-10 h-10 text-slate-400" />
-                    </div>
-                    <h2 className="text-2xl font-black text-slate-800 mb-2">جاري العمل على طلبك ⏳</h2>
-                    <p className="text-slate-500 font-bold leading-relaxed max-w-md">
-                        لم يتم تسجيل إجراءات التنازل لهذه القطعة حتى الآن. فريقنا يتابع الإجراءات في الجهاز بشكل مستمر. 
-                        <br/> <span className="text-amber-600">سنقوم بالتواصل معك على رقمك ({formData.phone_number}) فور صدور الموافقة!</span>
-                    </p>
+        {/* 👈 3. ربطنا الديف ده بالـ Ref عشان نعمل سكرول ليه */}
+        <div ref={resultRef} className="w-full">
+            {result?.status === 'success' && (
+                <div className="w-full bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-[2rem] p-6 md:p-10 shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-500 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400 animate-pulse"></div>
                     
-                    <div className="mt-6 flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-3 rounded-xl text-sm font-bold border border-blue-100">
-                        <AlertCircle className="w-5 h-5 shrink-0" />
-                        تأكد من إدخال رقم القطعة والحي بشكل صحيح.
+                    <div className="flex flex-col items-center text-center mb-8">
+                        <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)] animate-bounce">
+                            <Sparkles className="w-8 h-8 text-white" />
+                        </div>
+                        <h2 className="text-3xl font-black text-emerald-800 mb-2">ألف مبروك يا {formData.full_name.split(' ')[0]}! 🎉</h2>
+                        <p className="text-emerald-600 font-bold">تم إنهاء إجراءات التنازل بنجاح للقطعة الخاصة بك.</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                        {/* 👈 4. الديزاين الجديد الاحترافي للقطعة والحي والمجاورة */}
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:col-span-2">
+                            <p className="text-xs text-slate-500 font-bold mb-3 flex items-center gap-2">
+                                <MapPin className="w-4 h-4" /> بيانات القطعة
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 flex-1 min-w-[100px] text-center">
+                                    <span className="block text-[10px] text-slate-400 font-bold mb-1">القطعة</span>
+                                    <span className="font-black text-slate-800 text-lg">{result.data.plot}</span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 flex-1 min-w-[100px] text-center">
+                                    <span className="block text-[10px] text-slate-400 font-bold mb-1">المجاورة</span>
+                                    <span className="font-black text-slate-800 text-lg">{result.data.neighborhood}</span>
+                                </div>
+                                <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 flex-1 min-w-[100px] text-center">
+                                    <span className="block text-[10px] text-slate-400 font-bold mb-1">الحي</span>
+                                    <span className="font-black text-slate-800 text-lg">{result.data.district}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                            <div className="bg-amber-50 p-3 rounded-xl"><Award className="w-6 h-6 text-amber-600" /></div>
+                            <div>
+                                <p className="text-[11px] text-slate-500 font-bold">رقم اللجنة</p>
+                                <p className="text-lg font-black text-slate-800">{result.data.committee_number}</p>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex items-center gap-4">
+                            <div className="bg-purple-50 p-3 rounded-xl"><Calendar className="w-6 h-6 text-purple-600" /></div>
+                            <div>
+                                <p className="text-[11px] text-slate-500 font-bold">تاريخ الإجراء</p>
+                                <p className="text-lg font-black text-slate-800">{result.data.date}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 md:col-span-2 flex items-center gap-4">
+                            <div className="bg-blue-50 p-3 rounded-xl"><CheckCircleIcon className="w-6 h-6 text-blue-600" /></div>
+                            <div>
+                                <p className="text-[11px] text-slate-500 font-bold">الإجراء الذي تم</p>
+                                <p className="text-lg font-black text-slate-800">{result.data.procedure}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        )}
+            )}
+
+            {result?.status === 'pending' && (
+                <div className="w-full bg-gradient-to-br from-rose-50 to-red-50 border-2 border-rose-200 rounded-[2rem] p-6 md:p-10 shadow-lg animate-in slide-in-from-bottom-8 fade-in duration-500 relative overflow-hidden">
+                    {/* 🔴 خط متحرك فوق زي بتاع النجاح بس أحمر */}
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 via-rose-400 to-red-400 animate-pulse"></div>
+
+                    <div className="flex flex-col items-center text-center">
+                        {/* ⏳ أنيميشن الساعة الرملية بتلف */}
+                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-5 border-4 border-rose-100 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+                            <Hourglass className="w-10 h-10 text-rose-500 animate-[spin_3s_linear_infinite]" />
+                        </div>
+                        
+                        {/* 🥺 رسالة شخصية لطيفة */}
+                        <h2 className="text-2xl font-black text-rose-800 mb-2">
+                            لسه شوية يا {formData.full_name.split(' ')[0]} 🥺
+                        </h2>
+                        
+                        <p className="text-rose-600 font-bold leading-relaxed max-w-md">
+                            لم يتم تسجيل إجراءات التنازل لهذه القطعة حتى الآن. فريقنا يتابع الإجراءات في الجهاز بشكل مستمر. 
+                        </p>
+
+                        {/* 📱 تأكيد التواصل */}
+                        <div className="mt-4 bg-white/60 px-5 py-3 rounded-xl border border-rose-100 shadow-sm">
+                            <span className="text-red-700 font-black text-sm block">
+                                سنقوم بالتواصل معك على رقمك ({formData.phone_number}) فور صدور الموافقة! 🚀
+                            </span>
+                        </div>
+                        
+                        {/* 💡 تنبيه خفيف */}
+                        <div className="mt-6 flex items-center justify-center gap-2 text-rose-500 text-xs font-bold">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            تأكد من إدخال رقم القطعة والحي بشكل صحيح، أو عاود الاستعلام لاحقاً.
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
 
       </div>
     </main>
