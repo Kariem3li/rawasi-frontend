@@ -2,6 +2,7 @@
 
 // ✅ قراءة الرابط ديناميكياً (لو رفعناه هيقرأ متغير البيئة، لو مفيش هيستخدم رابط Railway)
 export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://rawasi-project-v5-production.up.railway.app";
+//export const BASE_URL= process.env.NEXT_PUBLIC_BASE_URL || 'http://127.0.0.1:8000';
 export const API_URL = `${BASE_URL}/api`;
 
 export const getFullImageUrl = (imagePath: string | null | undefined): string => {
