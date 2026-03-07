@@ -12,16 +12,15 @@ export default function InstallPrompt() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // 1. فحص إذا كان التطبيق متسطب بالفعل
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     if (isStandalone) return;
 
-    // لو قفله، هيختفي لمدة 24 ساعة ويرجع يظهر تاني
-    const lastDismissed = localStorage.getItem('installPromptDismissed');
-    if (lastDismissed) {
-      const timePassed = Date.now() - parseInt(lastDismissed, 10);
-      const oneDay = 24 * 60 * 60 * 1000;
-      if (timePassed < oneDay) return;
-    }
+    // 🚀 2. السحر هنا: استخدام sessionStorage بدل localStorage
+    // كده لو قفل الرسالة، مش هتظهرله تاني طول ما هو فاتح الموقع (حتى لو راح صفحات تانية ورجع)
+    // بس لو قفل التاب وفتح الموقع من جديد، هتظهرله تاني.
+    const isDismissedThisSession = sessionStorage.getItem('installPromptDismissed');
+    if (isDismissedThisSession) return;
 
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
@@ -30,8 +29,8 @@ export default function InstallPrompt() {
       setIsIOS(true);
       setTimeout(() => {
         setShowPrompt(true);
-        setTimeout(() => setAnimateIn(true), 50); // أنيميشن الظهور الناعم
-      }, 3000); // بيظهر بعد 3 ثواني من فتح الموقع عشان ميزعجش العميل
+        setTimeout(() => setAnimateIn(true), 50); 
+      }, 3500); // تظهر بعد 3.5 ثانية بهدوء
     }
 
     const handleBeforeInstallPrompt = (e: any) => {
@@ -41,7 +40,7 @@ export default function InstallPrompt() {
       setTimeout(() => {
         setShowPrompt(true);
         setTimeout(() => setAnimateIn(true), 50);
-      }, 3000);
+      }, 3500);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -59,87 +58,95 @@ export default function InstallPrompt() {
   };
 
   const handleDismiss = () => {
-    setAnimateIn(false); // أنيميشن الاختفاء أولاً
+    setAnimateIn(false); 
     setTimeout(() => {
       setShowPrompt(false);
-      localStorage.setItem('installPromptDismissed', Date.now().toString());
-    }, 400); // نستنى الأنيميشن يخلص قبل ما نشيله من الشاشة
+      // 🚀 حفظ الإغلاق في الجلسة الحالية فقط
+      sessionStorage.setItem('installPromptDismissed', 'true');
+    }, 400); 
   };
 
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[9999] px-4 pb-6 sm:px-6 sm:pb-8 pointer-events-none flex justify-center">
-      {/* البوكس الرئيسي مع الأنيميشن */}
+    <div className="fixed inset-x-0 bottom-24 z-[9999] px-4 sm:px-6 pointer-events-none flex justify-center">
+      {/* 🌟 الكارت الرئيسي بتصميم زجاجي وتدرج لوني خفيف */}
       <div 
-        className={`pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-[2rem] bg-white/95 backdrop-blur-xl border border-white/50 p-5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] transition-all duration-500 ease-out transform ${
-          animateIn ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+        className={`pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-[2.5rem] bg-white/80 backdrop-blur-2xl border border-white/60 p-6 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.1),0_0_40px_-10px_rgba(245,158,11,0.2)] transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] transform ${
+          animateIn ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'
         }`}
       >
         
-        {/* زرار الإغلاق (X) الشيك */}
+        {/* زرار الإغلاق */}
         <button 
           onClick={handleDismiss}
-          className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100/80 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800"
+          className="absolute top-5 right-5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100/80 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500 hover:rotate-90 duration-300"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
-        <div className="flex items-start gap-4 mt-2">
-          {/* 🔴 هنا تقدري تغيري لون خلفية الأيقونة للون موقعك (بدل bg-slate-900) 🔴 */}
-          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-amber-600 shadow-lg">
-            {/* لو عندك صورة اللوجو، امسحي الـ svg ده وحطي <img src="/logo.png" /> */}
-            <img src="public/icons/Gemini_Generated_Image_ykgajuykgajuykga.png" />
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent"></div>
+        <div className="flex items-center gap-4">
+          {/* 🖼️ حل مشكلة الصورة مع إطار ذهبي احترافي */}
+          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-amber-500/30 p-0.5 bg-gradient-to-tr from-amber-400 to-amber-600">
+            <div className="w-full h-full bg-white rounded-[14px] overflow-hidden">
+              {/* لاحظ مسار الصورة اتصلح (شيلنا كلمة public) */}
+              <img 
+                src="/icons/Gemini_Generated_Image_ykgajuykgajuykga.png" 
+                alt="شعار رواسي"
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
           
-          <div className="flex-1 pt-1">
-            <h3 className="text-[1.15rem] font-extrabold text-slate-900 tracking-tight">رواسي للعقارات</h3>
-            <div className="mt-1 flex items-center gap-1">
-              {/* نجوم التقييم لإعطاء إحساس بالثقة */}
-              <div className="flex text-amber-400">
+          <div className="flex-1">
+            {/* نص بتدرج لوني */}
+            <h3 className="text-xl font-black bg-gradient-to-l from-slate-900 to-slate-700 bg-clip-text text-transparent tracking-tight">
+              رواسي للعقارات
+            </h3>
+            <div className="mt-1 flex items-center gap-1.5">
+              <div className="flex text-amber-500 drop-shadow-sm">
                 {[...Array(5)].map((_, i) => (
                   <svg key={i} className="h-3.5 w-3.5 fill-current" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
                 ))}
               </div>
-              <span className="text-xs font-medium text-slate-500">تجربة أسرع</span>
+              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">تجربة أسرع</span>
             </div>
           </div>
         </div>
 
-        {/* الأكشن: زرار التسطيب أو تعليمات الآيفون */}
         <div className="mt-6">
           {isIOS ? (
-            <div className="relative overflow-hidden rounded-xl bg-slate-50 border border-slate-100 p-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-lg bg-white p-1.5 shadow-sm">
-                  <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 p-4">
+              <div className="flex items-start gap-3 relative z-10">
+                <div className="mt-0.5 rounded-xl bg-white p-2 shadow-sm border border-blue-100 text-blue-500">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                 </div>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  لتثبيت التطبيق، اضغط على زر <strong className="text-slate-900 font-bold">المشاركة</strong> بالأسفل ثم اختر <strong className="text-slate-900 font-bold">إضافة للشاشة الرئيسية</strong>
+                <p className="text-[13px] text-slate-700 font-medium leading-relaxed">
+                  لتثبيت التطبيق، اضغط على <strong className="text-blue-700 font-black">المشاركة</strong> بالأسفل ثم اختر <br/> <strong className="text-blue-700 font-black">إضافة للشاشة الرئيسية (Add to Home Screen)</strong>
                 </p>
               </div>
             </div>
           ) : (
             isInstallable && (
-              /* 🔴 هنا تقدري تغيري لون الزرار للون موقعك (بدل bg-slate-900) 🔴 */
               <button 
                 onClick={handleInstallClick}
-                className="group relative w-full overflow-hidden rounded-xl bg-slate-900 px-4 py-3.5 font-bold text-white transition-all hover:bg-amber-600 active:scale-[0.98] shadow-md"
+                className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 p-[2px] shadow-lg shadow-amber-500/30 transition-all hover:scale-[1.02] active:scale-95"
               >
-                <div className="absolute inset-0 bg-white/20 translate-y-full transition-transform group-hover:translate-y-0 duration-300"></div>
-                <span className="relative flex items-center justify-center gap-2 text-[15px]">
-                  تثبيت التطبيق الآن
-                  <svg className="h-5 w-5 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                {/* تأثير لمعة خفيفة بتتحرك جوا الزرار */}
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] transition-transform group-hover:translate-x-[100%] duration-1000 ease-in-out"></div>
+                
+                <div className="relative flex h-12 items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r from-slate-900 to-slate-800 px-4 text-white transition-colors group-hover:from-slate-800 group-hover:to-slate-700">
+                  <span className="font-black text-sm tracking-wide text-amber-50">تثبيت التطبيق مجاناً</span>
+                  <svg className="h-5 w-5 text-amber-400 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                </span>
+                </div>
               </button>
             )
           )}
