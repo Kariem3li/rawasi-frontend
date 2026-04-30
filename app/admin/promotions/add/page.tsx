@@ -181,10 +181,10 @@ export default function AddPromotion() {
 
       setStatusMsg("تمت الإضافة بنجاح! 🚀");
       setTimeout(() => router.push('/admin/promotions'), 1500);
-    } catch (error) {
-      console.error(error);
-      alert("سبب الرفض من دجانجو: " + JSON.stringify(error.response?.data || error.message));
-      setSubmitting(false);
+    }  catch (error) {
+        const err = error as any; // عمل casting مؤقت
+        console.error(err);
+        alert("سبب الرفض من دجانجو: " + JSON.stringify(err.response?.data || err.message));
     }
   };
 
