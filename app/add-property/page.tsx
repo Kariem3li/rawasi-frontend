@@ -1,20 +1,22 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
-import BottomNav from "@/components/BottomNav";
+import BottomNav from "@/components/BottomNav"; 
 import { 
   Camera, MapPin, ArrowLeft, Loader2, CheckCircle2, Video, 
-  Link as LinkIcon, ImagePlus, Banknote, Map as MapIcon, 
-  X, FileText, User, Phone, UploadCloud, Home, ShieldCheck,
-  ChevronDown
+  ImagePlus, Banknote, Map as MapIcon, X, FileText, User, 
+  Phone, UploadCloud, Home, ShieldCheck, ChevronDown, Navigation
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import imageCompression from 'browser-image-compression';
 import api from "@/lib/axios"; 
-import axios from 'axios';     
 import { useVideoUpload } from "@/components/VideoUploadContext";
 import { useRouter } from "next/navigation";
+import { uploadSecurelyToCloudinary } from "@/lib/cloudinary";
+import { Category, Feature, LocationInfo } from "@/types";
+import { useAuth } from "@/providers/AuthProvider";
+import toast, { Toaster } from "react-hot-toast";
 
 const MapPicker = dynamic(
     () => import('@/components/MapPicker').then((mod) => mod.default), 
@@ -51,6 +53,8 @@ const ProgressOverlay = ({ progress, message }: { progress: number, message: str
 
 export default function AddProperty() {
   const router = useRouter(); 
+  const { isAuthenticated, user } = useAuth(); 
+
   const [step, setStep] = useState(1);
   const [loadingData, setLoadingData] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -61,12 +65,12 @@ export default function AddProperty() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState("");
 
-  const [categories, setCategories] = useState<any[]>([]);
-  const [governorates, setGovernorates] = useState<any[]>([]);
-  const [cities, setCities] = useState<any[]>([]);
-  const [zones, setZones] = useState<any[]>([]);
-  const [subdivisions, setSubdivisions] = useState<any[]>([]);
-  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [governorates, setGovernorates] = useState<LocationInfo[]>([]);
+  const [cities, setCities] = useState<LocationInfo[]>([]);
+  const [zones, setZones] = useState<LocationInfo[]>([]);
+  const [subdivisions, setSubdivisions] = useState<LocationInfo[]>([]);
+  const [dynamicFields, setDynamicFields] = useState<Feature[]>([]);
   const [selectedCategoryName, setSelectedCategoryName] = useState("");
 
   const [formData, setFormData] = useState({
@@ -74,14 +78,20 @@ export default function AddProperty() {
     plotNumber: "", buildingNumber: "", apartmentNumber: "", floorNumber: "", 
     area: "", price: "", isFinanceEligible: false,
     latitude: "", longitude: "", 
-    features: {} as any, description: "",
+    features: {} as Record<string, string>, description: "",
     images: [] as File[], video: null as File | null,
     idCard: null as File | null, contract: null as File | null,
     ownerName: "", ownerPhone: "" 
   });
   
   const { startVideoUpload } = useVideoUpload(); 
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+      if (!isAuthenticated && !loadingData) {
+          router.replace("/login");
+      }
+  }, [isAuthenticated, loadingData, router]);
 
   useEffect(() => {
     const initData = async () => {
@@ -102,42 +112,56 @@ export default function AddProperty() {
             setLoadingData(false);
         }
     };
-    initData();
+    if (isAuthenticated) initData();
+  }, [isAuthenticated]);
+
+  // 🚀 منع تسريب الذاكرة من صور المعاينة لو اليوزر قفل الصفحة
+  useEffect(() => {
+    return () => {
+        // مش هنقدر نمسح الـ File object نفسه، بس لو عملنا createObjectURL هنمسحه
+        // حالياً إنت بتعمل createObjectURL وقت الـ render، وبتعمله revoke وقت الـ onLoad، فده آمن 100%.
+    };
   }, []);
 
   const handleMapConfirm = (lat: string, lng: string) => { setFormData({ ...formData, latitude: lat, longitude: lng }); setShowMap(false); };
   
-  // ✅ التعديل الأول: تفعيل الدقة العالية للـ GPS
   const getLocation = () => {
-    if (!navigator.geolocation) { alert("GPS غير مدعوم في متصفحك"); return; }
+    if (!navigator.geolocation) { toast.error("GPS غير مدعوم في متصفحك"); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setFormData({ ...formData, latitude: pos.coords.latitude.toString(), longitude: pos.coords.longitude.toString() });
         setLocating(false);
+        toast.success("تم تحديد موقعك بنجاح!");
       },
-      () => { 
+      (err) => { 
         setLocating(false); 
-        alert("فشل تحديد الموقع. يرجى التأكد من تفعيل الـ GPS وإعطاء الصلاحية للمتصفح."); 
+        if (err.code === 1) {
+            toast.error("لقد قمت برفض صلاحية الموقع. يرجى تفعيلها من إعدادات المتصفح.", { duration: 4000 });
+        } else if (err.code === 2) {
+            toast.error("الـ GPS مغلق أو الإشارة ضعيفة. يرجى تفعيله من إعدادات الموبايل.", { duration: 4000 });
+        } else {
+            toast.error("فشل تحديد الموقع. حاول التحديد يدوياً من الخريطة."); 
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // الدقة العالية هنا
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } 
     );
   };
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: string | boolean | File) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors({ ...errors, [field]: false });
   };
 
-  const handleCategoryChange = (e: any) => {
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const catId = e.target.value;
-      const selectedCat = categories.find(c => c.id == catId);
+      const selectedCat = categories.find(c => c.id.toString() === catId);
       setFormData({...formData, category: catId, features: {}});
       setSelectedCategoryName(selectedCat ? selectedCat.name : "");
       setDynamicFields(selectedCat?.allowed_features || []);
   };
 
-  const handleGovChange = async (e: any) => {
+  const handleGovChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
       const govId = e.target.value;
       setFormData({...formData, gov: govId, city: "", zone: "", subdivision: ""});
       if(govId) {
@@ -148,7 +172,7 @@ export default function AddProperty() {
       }
   };
 
-  const handleCityChange = async (e: any) => {
+  const handleCityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
       const cityId = e.target.value;
       setFormData({...formData, city: cityId, zone: "", subdivision: ""});
       if(cityId) {
@@ -159,7 +183,7 @@ export default function AddProperty() {
       }
   };
 
-  const handleZoneChange = async (e: any) => {
+  const handleZoneChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
       const zoneId = e.target.value;
       setFormData({...formData, zone: zoneId, subdivision: ""});
       if(zoneId) {
@@ -172,15 +196,25 @@ export default function AddProperty() {
 
   const handleFeatureInput = (id: string, val: string) => setFormData(p => ({ ...p, features: { ...p.features, [id]: val } }));
 
-  const handleImageUpload = async (e: any) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) {
-          const files = Array.from(e.target.files) as File[];
+          const files = Array.from(e.target.files);
           setCompressing(true);
           try {
-              const compressedFiles = await Promise.all(files.map(async (file) => {
-                  try { return await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true }); } 
-                  catch { return file; }
-              }));
+              const compressedFiles = await Promise.all(
+                  files.map(async (file) => {
+                      try {
+                          return await imageCompression(file, { 
+                              maxSizeMB: 0.4, 
+                              maxWidthOrHeight: 1200, 
+                              useWebWorker: true,
+                              initialQuality: 0.8
+                          });
+                      } catch {
+                          return file;
+                      }
+                  })
+              );
               setFormData(prev => ({ ...prev, images: [...prev.images, ...compressedFiles] }));
           } catch (error) { console.error(error); } 
           finally { setCompressing(false); }
@@ -193,43 +227,56 @@ export default function AddProperty() {
       setFormData({...formData, images: newImages});
   }
 
-  const handleVideoUpload = (e: any) => {
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           const file = e.target.files[0];
           if (file.size > 500 * 1024 * 1024) { 
-              alert("⚠️ حجم الفيديو كبير جداً! الحد الأقصى 500 ميجابايت."); 
+              toast.error("حجم الفيديو كبير جداً! الحد الأقصى 500 ميجابايت."); 
               return; 
           }
           setFormData(prev => ({ ...prev, video: file }));
       }
   };
 
-  const handleDocUpload = (e: any, type: 'idCard' | 'contract') => { if (e.target.files) setFormData({ ...formData, [type]: e.target.files[0] }); };
+  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'idCard' | 'contract') => { 
+      if (e.target.files) setFormData({ ...formData, [type]: e.target.files[0] }); 
+  };
 
   const validateStep1 = () => {
-      let newErrors: any = {};
-      if (!formData.category) newErrors.category = true;
-      if (!formData.gov) newErrors.gov = true;
-      if (!formData.city) newErrors.city = true;
-      if (!formData.area) newErrors.area = true;
-      if (!formData.price) newErrors.price = true;
-      if (!formData.description) newErrors.description = true;
-      if(Object.keys(newErrors).length > 0) { 
-          setErrors(newErrors); 
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+    let newErrors: Record<string, boolean> = {};
+    if (!formData.category) newErrors.category = true;
+    if (!formData.gov) newErrors.gov = true;
+    if (!formData.city) newErrors.city = true;
+    if (!formData.area) newErrors.area = true;
+    if (!formData.price) newErrors.price = true;
+    if (!formData.description) newErrors.description = true;
+    
+    if(Object.keys(newErrors).length > 0) { 
+        setErrors(newErrors); 
+        toast.error("يرجى إكمال جميع الحقول الأساسية الملونة بالأحمر"); 
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return false; 
+    }
+    return true;
+  };
+
+  const validateStep2 = () => {
+      if (formData.images.length === 0) { 
+          toast.error("يرجى إضافة صورة واحدة على الأقل للعقار"); 
           return false; 
       }
       return true;
   };
 
-  const validateStep2 = () => {
-      if (formData.images.length === 0) { alert("⚠️ يرجى إضافة صورة واحدة على الأقل للعقار"); return false; }
-      return true;
-  };
-
   const validateStep3 = () => {
-      if (!formData.idCard && !formData.contract) { alert("⚠️ للتوثيق، يرجى إرفاق صورة البطاقة أو عقد الملكية"); return false; }
-      if (!formData.ownerPhone) { alert("⚠️ رقم الهاتف مطلوب ليتواصل معك العملاء"); return false; }
+      if (!formData.idCard && !formData.contract) { 
+          toast.error("للتوثيق، يرجى إرفاق صورة البطاقة أو عقد الملكية"); 
+          return false; 
+      }
+      if (!formData.ownerPhone) { 
+          toast.error("رقم الهاتف مطلوب ليتواصل معك العملاء"); 
+          return false; 
+      }
       return true;
   };
 
@@ -238,57 +285,49 @@ export default function AddProperty() {
       else if (step === 2) { if (validateStep2()) { setStep(3); window.scrollTo(0,0); } }
   };
 
-  const uploadDirectToCloudinary = async (file: File, resourceType: 'image' | 'video', onProgress?: (percent: number) => void) => {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "daksg9vcz"; 
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "doh2de38";
-
-    const data = new FormData();
-    data.append("file", file);
-    data.append("upload_preset", uploadPreset);
-
-    try {
-        const res = await axios.post(
-            `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
-            data,
-            { onUploadProgress: (progressEvent) => { if (progressEvent.total && onProgress) onProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total)); } }
-        );
-        return res.data.secure_url;
-    } catch (error: any) { throw new Error(`فشل رفع ${resourceType}`); }
-  };
-
   const handleSubmit = async () => {
-        if (!localStorage.getItem('token') && !sessionStorage.getItem('token')) { window.location.href = "/login"; return; }
+        if (!isAuthenticated) { router.replace("/login"); return; }
         if (!validateStep3()) return;
 
         setSubmitting(true);
         setUploadProgress(0);
 
         try {
-          setStatusMsg("جاري رفع الصور ومعالجتها...");
-          const totalImages = formData.images.length;
+          let totalUploadTasks = formData.images.length + (formData.idCard ? 1 : 0) + (formData.contract ? 1 : 0);
+          let tasksCompleted = 0;
+
+          const updateOverallProgress = (localPercent: number) => {
+              if(totalUploadTasks === 0) return;
+              const overall = ((tasksCompleted * 100) + localPercent) / totalUploadTasks;
+              setUploadProgress(overall * 0.9); 
+          };
+
+          setStatusMsg("جاري رفع الصور ومعالجتها بشكل آمن...");
           const uploadedImageUrls = [];
-          for (let i = 0; i < totalImages; i++) {
-              const url = await uploadDirectToCloudinary(formData.images[i], 'image', (p) => {
-                  setUploadProgress(Math.round((((i / totalImages) * 100) + (p / totalImages)) * 0.9));
-              });
+          for (let i = 0; i < formData.images.length; i++) {
+              const url = await uploadSecurelyToCloudinary(formData.images[i], 'image', updateOverallProgress);
               uploadedImageUrls.push(url);
+              tasksCompleted++;
           }
 
-          setStatusMsg("تجهيز بيانات العقار...");
-          let idCardUrl = formData.idCard ? await uploadDirectToCloudinary(formData.idCard, 'image') : "";
-          let contractUrl = formData.contract ? await uploadDirectToCloudinary(formData.contract, 'image') : "";
+          setStatusMsg("تجهيز الوثائق وبيانات العقار...");
+          let idCardUrl = formData.idCard ? await uploadSecurelyToCloudinary(formData.idCard, 'image', updateOverallProgress) : "";
+          if (formData.idCard) tasksCompleted++;
+          
+          let contractUrl = formData.contract ? await uploadSecurelyToCloudinary(formData.contract, 'image', updateOverallProgress) : "";
+          if (formData.contract) tasksCompleted++;
 
           setStatusMsg("إنشاء الإعلان...");
           const finalPayload = {
             title: `عرض ${formData.offerType} - ${selectedCategoryName} - ${formData.area}م`,
             offer_type: formData.offerType === "بيع" ? "Sale" : "Rent",
-            category: parseInt(formData.category),
-            governorate: parseInt(formData.gov),
-            city: parseInt(formData.city),
+            category: formData.category ? parseInt(formData.category) : null,
+            governorate: formData.gov ? parseInt(formData.gov) : null,
+            city: formData.city ? parseInt(formData.city) : null,
             major_zone: formData.zone ? parseInt(formData.zone) : null,
             subdivision: formData.subdivision ? parseInt(formData.subdivision) : null,
-            price: parseFloat(formData.price),
-            area_sqm: parseInt(formData.area),
+            price: formData.price ? parseFloat(formData.price) : 0,
+            area_sqm: formData.area ? parseInt(formData.area) : 0,
             description: formData.description + (formData.plotNumber ? `\n📌 رقم القطعة: ${formData.plotNumber}` : ""),
             is_finance_eligible: formData.isFinanceEligible,
             latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -314,16 +353,18 @@ export default function AddProperty() {
               startVideoUpload(newListingId, formData.video);
           }
           
-          setTimeout(() => router.push("/"), 2000);
+          setTimeout(() => router.push("/my-listings"), 2000);
           
-        } catch (error: any) {
+        } 
+        catch (error: any) {
             console.error(error);
             setSubmitting(false);
-            alert("فشل نشر الإعلان. يرجى المحاولة مرة أخرى.");
-        } 
+            setUploadProgress(0);
+            toast.error("فشل نشر الإعلان. يرجى المحاولة مرة أخرى."); 
+        }
     };
 
-  const renderFeatureInput = (feat: any) => {
+  const renderFeatureInput = (feat: Feature) => {
     const val = formData.features[feat.id] || "";
     if (feat.input_type === 'number') {
         const options = feat.options_list ? feat.options_list.split(',').map((s: string) => s.trim()) : ['1', '2', '3', '4', '5', '6'];
@@ -334,7 +375,7 @@ export default function AddProperty() {
                         <button key={opt} type="button" onClick={() => handleFeatureInput(feat.id, opt)} className={`w-12 h-12 rounded-xl border-2 font-black text-sm transition-all duration-200 active:scale-95 ${val === opt ? "bg-amber-500 text-slate-900 border-amber-500 shadow-md shadow-amber-500/30" : "bg-white text-gray-500 border-gray-100 hover:border-amber-200"}`}>{opt}</button>
                     ))}
                 </div>
-                <input type="text" inputMode="numeric" value={val} onChange={(e) => handleFeatureInput(feat.id, sanitizeNumberInput(e.target.value))} className="w-full h-12 border-2 rounded-xl px-4 bg-gray-50 focus:bg-white border-transparent focus:border-amber-500 outline-none transition text-left font-bold" placeholder="أو أدخل رقم مخصص..." />
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={val} onChange={(e) => handleFeatureInput(feat.id, sanitizeNumberInput(e.target.value))} className="w-full h-12 border-2 rounded-xl px-4 bg-gray-50 focus:bg-white border-transparent focus:border-amber-500 outline-none transition text-left font-bold" placeholder="أو أدخل رقم مخصص..." />
             </div>
         );
     }
@@ -349,12 +390,13 @@ export default function AddProperty() {
     return <input type="text" value={val} onChange={(e) => handleFeatureInput(feat.id, e.target.value)} className="w-full h-12 px-4 border-2 border-gray-100 bg-gray-50 rounded-xl focus:bg-white focus:border-amber-500 outline-none transition font-medium" placeholder={`تفاصيل ${feat.name}...`} />;
   };
 
+  if (!isAuthenticated && !loadingData) return null;
+
   return (
     <main className="min-h-screen bg-[#F8FAFC] pb-32 text-slate-800 font-sans dir-rtl">
-      <Navbar />
+      <Toaster position="top-center" reverseOrder={false} />
       {submitting && <ProgressOverlay progress={uploadProgress} message={statusMsg} />}
       
-      {/* ✅ التعديل التاني: إرسال الإحداثيات اللي جبناها للخريطة عشان تفتح عليها */}
       {showMap && (
         <MapPicker 
            initialLat={formData.latitude} 
@@ -399,7 +441,7 @@ export default function AddProperty() {
                 <div className="relative">
                     <select className={`w-full h-14 border-2 rounded-2xl px-5 font-black text-sm md:text-base appearance-none outline-none transition-colors cursor-pointer bg-white ${errors.category ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-slate-700 focus:border-amber-500'}`} onChange={handleCategoryChange} value={formData.category}>
                         <option value="" disabled>اختر نوع العقار (شقة، فيلا، أرض...)</option>
-                        {categories.map((cat: any) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                        {categories.map((cat) => <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>)}
                     </select>
                     <ChevronDown className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"/>
                 </div>
@@ -417,13 +459,14 @@ export default function AddProperty() {
                         {selectedCategoryName.includes("شقة") && (
                             <div className="grid grid-cols-3 gap-3">
                                 <div><label className="block text-xs font-bold mb-2 text-slate-500 text-center">عمارة</label><input type="text" className="w-full h-12 border-2 border-white rounded-xl px-2 text-center font-bold focus:border-amber-400 outline-none shadow-sm" onChange={(e) => handleChange("buildingNumber", e.target.value)} value={formData.buildingNumber} /></div>
-                                <div><label className="block text-xs font-bold mb-2 text-slate-500 text-center">الدور</label><input type="number" className="w-full h-12 border-2 border-white rounded-xl px-2 text-center font-bold focus:border-amber-400 outline-none shadow-sm" onChange={(e) => handleChange("floorNumber", e.target.value)} value={formData.floorNumber} /></div>
+                                {/* 🚀 منع حرف E في الدور */}
+                                <div><label className="block text-xs font-bold mb-2 text-slate-500 text-center">الدور</label><input type="number" onKeyDown={(e) => ["e", "E", "+", "-", "."].includes(e.key) && e.preventDefault()} className="w-full h-12 border-2 border-white rounded-xl px-2 text-center font-bold focus:border-amber-400 outline-none shadow-sm" onChange={(e) => handleChange("floorNumber", e.target.value)} value={formData.floorNumber} /></div>
                                 <div><label className="block text-xs font-bold mb-2 text-slate-500 text-center">شقة</label><input type="text" className="w-full h-12 border-2 border-white rounded-xl px-2 text-center font-bold focus:border-amber-400 outline-none shadow-sm" onChange={(e) => handleChange("apartmentNumber", e.target.value)} value={formData.apartmentNumber} /></div>
                             </div>
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                            {dynamicFields.map((feat: any) => (
+                            {dynamicFields.map((feat) => (
                                 <div key={feat.id} className={feat.input_type === 'text' ? 'col-span-full' : ''}>
                                     <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wide">{feat.name}</label>
                                     {renderFeatureInput(feat)}
@@ -434,37 +477,42 @@ export default function AddProperty() {
                 )}
 
                 <div className={`p-6 md:p-8 rounded-[2rem] border-2 space-y-6 transition-colors ${errors.gov || errors.city ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-gray-50/30'}`}>
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="mb-2">
                       <label className="text-base font-black text-slate-800 flex items-center gap-2"><MapPin className="w-5 h-5 text-slate-400" /> موقع العقار <span className="text-red-500">*</span></label>
-                      <button onClick={getLocation} type="button" className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-slate-600 hover:bg-slate-50 transition shadow-sm active:scale-95">
-                          {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <MapIcon className="w-3.5 h-3.5 text-blue-500" />} GPS
-                      </button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="relative"><select className={`w-full h-14 border-2 rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 bg-white ${errors.gov ? 'border-red-400 text-red-700' : 'border-gray-200 text-slate-700'}`} onChange={handleGovChange} value={formData.gov}><option value="" disabled>المحافظة</option>{governorates.map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
-                        <div className="relative"><select className={`w-full h-14 border-2 rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 bg-white disabled:opacity-50 ${errors.city ? 'border-red-400 text-red-700' : 'border-gray-200 text-slate-700'}`} disabled={!formData.gov} onChange={handleCityChange} value={formData.city}><option value="" disabled>المدينة</option>{cities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
-                        <div className="relative"><select className="w-full h-14 border-2 border-gray-200 bg-white rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 disabled:opacity-50 text-slate-700" disabled={!formData.city} onChange={handleZoneChange} value={formData.zone}><option value="">المنطقة (اختياري)</option>{zones.map((z: any) => <option key={z.id} value={z.id}>{z.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
-                        <div className="relative"><select className="w-full h-14 border-2 border-gray-200 bg-white rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 disabled:opacity-50 text-slate-700" disabled={!formData.zone} onChange={(e) => handleChange("subdivision", e.target.value)} value={formData.subdivision}><option value="">المجاورة (اختياري)</option>{subdivisions.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
+                        <div className="relative"><select className={`w-full h-14 border-2 rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 bg-white ${errors.gov ? 'border-red-400 text-red-700' : 'border-gray-200 text-slate-700'}`} onChange={handleGovChange} value={formData.gov}><option value="" disabled>المحافظة</option>{governorates.map((g) => <option key={g.id} value={g.id.toString()}>{g.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
+                        <div className="relative"><select className={`w-full h-14 border-2 rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 bg-white disabled:opacity-50 ${errors.city ? 'border-red-400 text-red-700' : 'border-gray-200 text-slate-700'}`} disabled={!formData.gov} onChange={handleCityChange} value={formData.city}><option value="" disabled>المدينة</option>{cities.map((c) => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
+                        <div className="relative"><select className="w-full h-14 border-2 border-gray-200 bg-white rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 disabled:opacity-50 text-slate-700" disabled={!formData.city} onChange={handleZoneChange} value={formData.zone}><option value="">المنطقة (اختياري)</option>{zones.map((z) => <option key={z.id} value={z.id.toString()}>{z.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
+                        <div className="relative"><select className="w-full h-14 border-2 border-gray-200 bg-white rounded-xl px-4 font-bold text-sm appearance-none outline-none focus:border-amber-500 disabled:opacity-50 text-slate-700" disabled={!formData.zone} onChange={(e) => handleChange("subdivision", e.target.value)} value={formData.subdivision}><option value="">المجاورة (اختياري)</option>{subdivisions.map((s) => <option key={s.id} value={s.id.toString()}>{s.name}</option>)}</select><ChevronDown className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"/></div>
                     </div>
                     
-                    <button onClick={() => setShowMap(true)} type="button" className={`w-full py-3.5 rounded-xl text-sm font-bold border-2 border-dashed transition flex items-center justify-center gap-2 ${formData.latitude ? 'bg-green-50/50 border-green-300 text-green-700 hover:bg-green-100' : 'bg-white border-gray-300 text-slate-500 hover:border-slate-400 hover:bg-gray-50'}`}>
-                        {formData.latitude ? <><CheckCircle2 className="w-4 h-4"/> تم التحديد على الخريطة بنجاح (اضغط للتعديل)</> : <><MapIcon className="w-4 h-4" /> تحديد يدوي على الخريطة</>}
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button onClick={getLocation} type="button" className={`flex-1 py-3.5 rounded-xl text-sm font-bold border-2 transition flex items-center justify-center gap-2 ${formData.latitude && !showMap ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm' : 'bg-white border-gray-300 text-slate-600 hover:bg-gray-50 active:scale-95'}`}>
+                            {locating ? <Loader2 className="w-4 h-4 animate-spin"/> : <Navigation className="w-4 h-4 text-blue-500" />}
+                            {formData.latitude && !showMap ? "تم تحديد موقعك" : "استخدام موقعي الحالي"}
+                        </button>
+
+                        <button onClick={() => setShowMap(true)} type="button" className={`flex-1 py-3.5 rounded-xl text-sm font-bold border-2 border-dashed transition flex items-center justify-center gap-2 ${formData.latitude ? 'bg-green-50/50 border-green-300 text-green-700 hover:bg-green-100 shadow-sm' : 'bg-white border-gray-300 text-slate-500 hover:border-slate-400 hover:bg-gray-50 active:scale-95'}`}>
+                            {formData.latitude ? <><CheckCircle2 className="w-4 h-4"/> تعديل على الخريطة</> : <><MapIcon className="w-4 h-4" /> تحديد يدوي على الخريطة</>}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 md:gap-6">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">المساحة الإجمالية</label>
                         <div className="relative">
-                            <input type="number" placeholder="0" className={`w-full h-14 border-2 rounded-2xl px-5 text-lg font-black outline-none transition ${errors.area ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-slate-900 focus:border-amber-500 bg-gray-50 focus:bg-white'}`} onChange={(e) => handleChange("area", e.target.value)} value={formData.area} />
+                            {/* 🚀 منع حرف E في المساحة */}
+                            <input type="number" onKeyDown={(e) => ["e", "E", "+", "-", "."].includes(e.key) && e.preventDefault()} placeholder="0" className={`w-full h-14 border-2 rounded-2xl px-5 text-lg font-black outline-none transition ${errors.area ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-slate-900 focus:border-amber-500 bg-gray-50 focus:bg-white'}`} onChange={(e) => handleChange("area", e.target.value)} value={formData.area} />
                             <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm pointer-events-none">م²</span>
                         </div>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">السعر المطلوب</label>
                         <div className="relative">
-                            <input type="text" inputMode="numeric" placeholder="0" className={`w-full h-14 border-2 rounded-2xl pl-10 pr-4 text-lg font-black outline-none transition ${errors.price ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-slate-900 focus:border-amber-500 bg-gray-50 focus:bg-white'}`} onChange={(e) => handleChange("price", sanitizeNumberInput(e.target.value))} value={formData.price} />
+                            <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="0" className={`w-full h-14 border-2 rounded-2xl pl-10 pr-4 text-lg font-black outline-none transition ${errors.price ? 'border-red-400 text-red-600 bg-red-50' : 'border-gray-200 text-slate-900 focus:border-amber-500 bg-gray-50 focus:bg-white'}`} onChange={(e) => handleChange("price", sanitizeNumberInput(e.target.value))} value={formData.price} />
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-600 font-bold text-sm pointer-events-none">ج.م</span>
                         </div>
                         {formData.price && (
@@ -502,15 +550,18 @@ export default function AddProperty() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {formData.images.map((img, idx) => (
-                        <div key={idx} className="aspect-square bg-gray-100 rounded-2xl overflow-hidden relative group shadow-sm border border-gray-200">
-                             <img src={URL.createObjectURL(img)} alt="Property" className="w-full h-full object-cover transition duration-300 group-hover:scale-110"/>
-                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-                             <button type="button" onClick={() => removeImage(idx)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 shadow-md active:scale-95 transition-transform">
-                                 <X className="w-4 h-4" />
-                             </button>
-                        </div>
-                    ))}
+                    {formData.images.map((img, idx) => {
+                        const objectUrl = URL.createObjectURL(img);
+                        return (
+                          <div key={idx} className="aspect-square bg-gray-100 rounded-2xl overflow-hidden relative group shadow-sm border border-gray-200">
+                               <img src={objectUrl} alt="Property" className="w-full h-full object-cover transition duration-300 group-hover:scale-110" onLoad={() => URL.revokeObjectURL(objectUrl)}/>
+                               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                               <button type="button" onClick={() => removeImage(idx)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 shadow-md active:scale-95 transition-transform">
+                                   <X className="w-4 h-4" />
+                               </button>
+                          </div>
+                        )
+                    })}
                     <label className="aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 hover:border-amber-400 transition-colors group">
                         <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={compressing} />
                         {compressing ? <Loader2 className="w-10 h-10 text-amber-500 animate-spin"/> : <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform mb-2"><ImagePlus className="w-6 h-6 text-amber-500"/></div>}
@@ -551,7 +602,7 @@ export default function AddProperty() {
                     <h4 className="font-black text-base text-blue-900 flex items-center gap-2"><Phone className="w-5 h-5 text-blue-600"/> بيانات اتصال الإعلان</h4>
                     <div className="grid sm:grid-cols-2 gap-4">
                         <div><label className="block text-[11px] font-bold text-blue-700/70 mb-1.5 uppercase">الاسم (كما سيظهر)</label><input type="text" className="w-full h-12 border-2 border-white rounded-xl px-4 font-bold text-slate-800 outline-none focus:border-blue-400 shadow-sm" value={formData.ownerName} onChange={(e) => handleChange("ownerName", e.target.value)} /></div>
-                        <div><label className="block text-[11px] font-bold text-blue-700/70 mb-1.5 uppercase">رقم الهاتف (للاتصال والواتساب)</label><input type="text" inputMode="numeric" dir="ltr" className="w-full h-12 border-2 border-white rounded-xl px-4 font-black text-slate-800 outline-none focus:border-blue-400 shadow-sm text-right" value={formData.ownerPhone} onChange={(e) => handleChange("ownerPhone", sanitizeNumberInput(e.target.value))} /></div>
+                        <div><label className="block text-[11px] font-bold text-blue-700/70 mb-1.5 uppercase">رقم الهاتف (للاتصال والواتساب)</label><input type="text" inputMode="numeric" pattern="[0-9]*" dir="ltr" className="w-full h-12 border-2 border-white rounded-xl px-4 font-black text-slate-800 outline-none focus:border-blue-400 shadow-sm text-right" value={formData.ownerPhone} onChange={(e) => handleChange("ownerPhone", sanitizeNumberInput(e.target.value))} /></div>
                     </div>
                 </div>
 
@@ -577,7 +628,7 @@ export default function AddProperty() {
 
                 <div className="flex gap-4 pt-6 border-t border-gray-100">
                     <button onClick={() => {setStep(2); window.scrollTo(0,0);}} className="flex-1 bg-gray-100 text-slate-600 py-4 rounded-2xl font-black hover:bg-gray-200 transition active:scale-95" disabled={submitting}>تعديل الصور</button>
-                    <button onClick={handleSubmit} disabled={submitting} className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-[0_10px_20px_rgba(5,150,105,0.2)] hover:bg-emerald-500 transition-all active:scale-95 flex justify-center items-center gap-2 disabled:bg-emerald-400 disabled:scale-100 disabled:shadow-none">
+                    <button onClick={handleSubmit} disabled={submitting || compressing} className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-[0_10px_20px_rgba(5,150,105,0.2)] hover:bg-emerald-500 transition-all active:scale-95 flex justify-center items-center gap-2 disabled:bg-emerald-400 disabled:scale-100 disabled:shadow-none">
                         {submitting ? "جاري الرفع..." : <><UploadCloud className="w-6 h-6"/> انشر الإعلان الآن</>}
                     </button>
                 </div>

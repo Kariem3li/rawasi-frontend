@@ -16,10 +16,8 @@ export default function AdminListings() {
 
   const fetchListings = async () => {
     try {
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      const res = await api.get('/admin-dashboard/listings/', {
-        headers: { Authorization: `Token ${token}` }
-      });
+      // 🚀 التوكن بيتبعت أوتوماتيك من axios مفيش داعي نكتب headers
+      const res = await api.get('/admin-dashboard/listings/');
       setListings(res.data);
     } catch (error) {
       console.error("Error fetching listings:", error);
@@ -32,16 +30,17 @@ export default function AdminListings() {
     if (!confirm(`هل أنت متأكد من تغيير حالة العقار إلى ${newStatus === 'Available' ? 'مقبول' : 'معلق'}؟`)) return;
     
     setActionLoading(id);
+    const previousListings = [...listings]; // 🚀 حفظ نسخة احتياطية للـ Rollback
+    
+    // تحديث الجدول محلياً (Optimistic Update)
+    setListings(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+
     try {
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      await api.post(`/admin-dashboard/listings/${id}/status/`, { status: newStatus }, {
-        headers: { Authorization: `Token ${token}` }
-      });
-      
-      // تحديث الجدول محلياً بدون ريفريش
-      setListings(listings.map(l => l.id === id ? { ...l, status: newStatus } : l));
+      await api.post(`/admin-dashboard/listings/${id}/status/`, { status: newStatus });
     } catch (error) {
-      alert("حدث خطأ أثناء تحديث الحالة.");
+      // 🚀 التراجع لو حصل خطأ
+      setListings(previousListings); 
+      alert("حدث خطأ أثناء تحديث الحالة، تم التراجع عن التغيير.");
     } finally {
       setActionLoading(null);
     }
@@ -52,6 +51,7 @@ export default function AdminListings() {
       case 'Available': return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">نشط (مقبول)</span>;
       case 'Pending': return <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">قيد المراجعة</span>;
       case 'Sold': return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">مباع</span>;
+      case 'Rejected': return <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold">مرفوض</span>;
       default: return <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold">{status}</span>;
     }
   };
@@ -87,7 +87,9 @@ export default function AdminListings() {
                   <td className="p-4">
                     <p className="font-bold text-slate-800 text-sm max-w-[200px] truncate">{listing.title}</p>
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-medium">
-                      <Tag className="w-3 h-3" /> {listing.offer_type} | <Home className="w-3 h-3" /> {listing.created_at}
+                      <Tag className="w-3 h-3" /> {listing.offer_type} | <Home className="w-3 h-3" /> 
+                      {/* عرض التاريخ بشكل أنظف */}
+                      {new Date(listing.created_at).toLocaleDateString('ar-EG', { year: "numeric", month: "short", day: "numeric" })}
                     </div>
                   </td>
                   <td className="p-4 font-bold text-sm text-slate-600">{listing.agent_name}</td>
@@ -95,12 +97,11 @@ export default function AdminListings() {
                   <td className="p-4">{getStatusBadge(listing.status)}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      {/* زرار المشاهدة */}
-                      <Link href={`/property/${listing.id}`} target="_blank" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition" title="مشاهدة">
+                      {/* 🚀 إصلاح مسار العقار */}
+                      <Link href={`/listings/${listing.id}`} target="_blank" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition" title="مشاهدة">
                         <Eye className="w-4 h-4" />
                       </Link>
                       
-                      {/* زرار القبول (يظهر لو العقار مش مقبول) */}
                       {listing.status !== 'Available' && (
                         <button 
                           onClick={() => updateStatus(listing.id, 'Available')}
@@ -112,7 +113,6 @@ export default function AdminListings() {
                         </button>
                       )}
 
-                      {/* زرار الرفض/التعليق (يظهر لو العقار مقبول) */}
                       {listing.status === 'Available' && (
                         <button 
                           onClick={() => updateStatus(listing.id, 'Pending')}

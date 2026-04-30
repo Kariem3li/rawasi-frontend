@@ -67,7 +67,6 @@ export default function MyListings() {
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] pb-32 font-sans dir-rtl">
-      <Navbar />
 
       {/* الهيدر الفخم */}
       <div className="bg-slate-900 text-white pt-24 pb-20 px-4 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">

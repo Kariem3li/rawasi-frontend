@@ -4,11 +4,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, EffectFade, Pagination, Navigation, Parallax } from 'swiper/modules';
-import api from '@/lib/axios'; // ✅ استخدام الـ api المخصص بتاعنا بدل axios العادي
+import api from '@/lib/axios'; 
 import { getFullImageUrl } from '@/lib/config'; 
 import { ArrowLeft, ArrowRight, Sparkles, Tag, ChevronLeft } from 'lucide-react';
 
-// استدعاء ملفات الـ CSS الخاصة بـ Swiper
 import 'swiper/css';
 import 'swiper/css/effect-fade';
 import 'swiper/css/pagination';
@@ -19,28 +18,35 @@ const HeroSlider = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 🚀 منع تسريب الذاكرة وتداخل الـ Requests
+    const controller = new AbortController();
+
     const fetchPromotions = async () => {
       try {
-        const res = await api.get(`/promotions/`);
+        const res = await api.get(`/promotions/`, { signal: controller.signal });
         const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
         setSlides(data);
-      } catch (error) {
-        console.error("Failed to fetch promotions:", error);
+      } catch (error: any) {
+        if (error.name !== 'CanceledError') {
+            console.error("Failed to fetch promotions:", error);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchPromotions();
+
+    return () => {
+        controller.abort();
+    };
   }, []);
 
-  // ✅ لو مفيش سلايدز خالص ومش بيحمل، نخفي المكون تماماً بنظافة
   if (!loading && slides.length === 0) return null;
 
   return (
     <section className="w-full px-4 pt-4 md:px-6 md:pt-6 bg-[#F8FAFC] dir-rtl pb-6 relative z-0 max-w-7xl mx-auto">
       
-      {/* ✅ الـ Skeleton Loader المحسن وقت التحميل */}
       {loading ? (
         <div className="w-full h-[55vh] md:h-[600px] bg-slate-200 animate-pulse rounded-[2rem] md:rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-end p-8 md:p-16">
             <div className="h-6 w-32 bg-slate-300 rounded-full mb-4"></div>
@@ -76,33 +82,30 @@ const HeroSlider = () => {
                 <Link 
                     href={slide.final_url || '#'} 
                     target={slide.open_in_new_tab ? '_blank' : '_self'}
-                    className="block w-full h-full relative"
+                    // 🚀 إضافة focus-visible عشان الـ Accessibility للكيبورد
+                    className="block w-full h-full relative group/link focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500 focus-visible:ring-inset"
+                    aria-label={`عرض تفاصيل: ${slide.title}`}
                 >
-                    {/* 1. الصورة الخلفية */}
                     <div 
                         className="absolute inset-0 w-full h-full" 
                         data-swiper-parallax="20%" 
                         data-swiper-parallax-scale="1.05" 
                     >
+                      {/* 🚀 الحماية من الـ Images المكسورة (Fallback) */}
                       <Image
-                        src={getFullImageUrl(slide.cover_image)}
+                        src={slide.cover_image ? getFullImageUrl(slide.cover_image) : "/images/placeholder-property.jpg"}
                         alt={slide.title}
                         fill
-                        // ✅ أول صورة بس تاخد أولوية عشان الـ SEO والسرعة
                         priority={idx === 0} 
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, 1200px"
                       />
-                      
-                      {/* تدرج لوني احترافي عشان الكلام يقرأ بوضوح تام */}
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-slate-900/10" />
                     </div>
 
-                    {/* 2. المحتوى */}
-                    <div className="absolute inset-0 flex flex-col justify-end pb-14 md:pb-20 px-6 md:px-16 z-20">
+                    <div className="absolute inset-0 flex flex-col justify-end pb-14 md:pb-20 px-6 md:px-16 z-20 pointer-events-none">
                         <div className="max-w-4xl transform transition-transform">
                             
-                            {/* الصف العلوي: البادج والعنوان الفرعي */}
                             <div className="flex flex-wrap items-center gap-3 mb-4 md:mb-5" data-swiper-parallax="-100">
                                 <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] md:text-xs font-black text-white tracking-wide border border-white/20 backdrop-blur-md shadow-lg
                                     ${slide.promo_type === 'PROJECT' ? 'bg-blue-600/80' : 
@@ -121,7 +124,6 @@ const HeroSlider = () => {
                                 )}
                             </div>
                             
-                            {/* العنوان الرئيسي */}
                             <h2 
                                 className="text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5 md:mb-8 drop-shadow-2xl line-clamp-2 md:line-clamp-none" 
                                 data-swiper-parallax="-200"
@@ -129,8 +131,8 @@ const HeroSlider = () => {
                               {slide.title}
                             </h2>
 
-                            {/* السعر والزر */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6" data-swiper-parallax="-300">
+                            {/* pointer-events-auto عشان الزرار يبقى Clickable جوا الديف اللي مقفول */}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 pointer-events-auto" data-swiper-parallax="-300">
                                 {slide.display_price && (
                                     <div className="bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-2.5 w-fit shadow-xl">
                                         <p className="text-[10px] text-amber-400 font-bold mb-1 flex items-center gap-1">
@@ -142,27 +144,27 @@ const HeroSlider = () => {
                                     </div>
                                 )}
                                 
-                                <button className="w-fit bg-white text-slate-900 px-6 py-3.5 md:px-8 md:py-4 rounded-xl font-black text-sm md:text-base hover:bg-amber-500 hover:text-white transition-all shadow-[0_10px_20px_rgba(0,0,0,0.2)] active:scale-95 duration-300 flex items-center gap-2 group/btn">
+                                <div className="w-fit bg-white text-slate-900 px-6 py-3.5 md:px-8 md:py-4 rounded-xl font-black text-sm md:text-base hover:bg-amber-500 hover:text-white transition-all shadow-[0_10px_20px_rgba(0,0,0,0.2)] flex items-center gap-2 group-hover/link:bg-amber-500 group-hover/link:text-white">
                                     {slide.button_text || "اكتشف التفاصيل"} 
-                                    <ChevronLeft className="w-5 h-5 rtl:rotate-180 transition-transform group-hover/btn:-translate-x-1" />
-                                </button>
+                                    <ChevronLeft className="w-5 h-5 rtl:rotate-180 transition-transform group-hover/link:-translate-x-1" />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </Link>
               </SwiperSlide>
             ))}
-          </Swiper>
 
-          {/* أزرار التنقل (تظهر في الديسك توب فقط عند تمرير الماوس) */}
-          <div className="absolute bottom-10 left-10 z-30 gap-3 opacity-0 group-hover:opacity-100 transition-all duration-500 hidden md:flex translate-y-4 group-hover:translate-y-0">
-             <button className="swiper-button-prev-custom w-12 h-12 rounded-full bg-slate-900/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-amber-500 hover:border-amber-500 transition-all hover:scale-110 active:scale-95 cursor-pointer">
-                <ArrowRight className="w-5 h-5" />
-             </button>
-             <button className="swiper-button-next-custom w-12 h-12 rounded-full bg-slate-900/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-amber-500 hover:border-amber-500 transition-all hover:scale-110 active:scale-95 cursor-pointer">
-                <ArrowLeft className="w-5 h-5" />
-             </button>
-          </div>
+            {/* 🚀 السحر: نقلنا أزرار الـ Navigation جوه الـ Swiper عشان نمنع الـ Race Condition */}
+            <div className="absolute bottom-10 left-10 z-30 gap-3 opacity-0 group-hover:opacity-100 transition-all duration-500 hidden md:flex translate-y-4 group-hover:translate-y-0">
+               <button aria-label="الشريحة السابقة" className="swiper-button-prev-custom w-12 h-12 rounded-full bg-slate-900/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-amber-500 hover:border-amber-500 transition-all hover:scale-110 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  <ArrowRight className="w-5 h-5" />
+               </button>
+               <button aria-label="الشريحة التالية" className="swiper-button-next-custom w-12 h-12 rounded-full bg-slate-900/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-amber-500 hover:border-amber-500 transition-all hover:scale-110 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  <ArrowLeft className="w-5 h-5" />
+               </button>
+            </div>
+          </Swiper>
         </div>
       )}
     </section>

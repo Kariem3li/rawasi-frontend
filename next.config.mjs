@@ -1,32 +1,29 @@
-import withPWAInit from "@ducanh2912/next-pwa";
-
-const withPWA = withPWAInit({
-  dest: "public",
-  disable: process.env.NODE_ENV === "development",
-});
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 1. حل مشكلة انهيار السيرفر (WorkerError)
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "kariem.pythonanywhere.com" },
+      { protocol: "https", hostname: "placehold.co" },
+      ...(process.env.NODE_ENV === "development" ? [
+        { protocol: "http", hostname: "localhost" },
+        { protocol: "http", hostname: "127.0.0.1" },
+        { protocol: "http", hostname: "192.168.1.5" }, 
+      ] : []),
+    ],
+    // 🚀 ضروري للموبايل
+    unoptimized: process.env.NODE_ENV === "development",
+  },
   experimental: {
     webpackBuildWorker: false,
-  },
-  
-  // 2. إسكات تحذير الـ Turbopack زي ما الإيرور طلب
-  turbopack: {},
-
-  // إعدادات الصور بتاعتنا زي ما هي
-  images: {
-    unoptimized: true,
-    remotePatterns: [
-        { protocol: 'https', hostname: 'rawasi-project-v5-production.up.railway.app' }, 
-        { protocol: 'https', hostname: 'res.cloudinary.com' }, 
-        { protocol: 'https', hostname: 'placehold.co' }, 
-        { protocol: 'http', hostname: '192.168.1.8' },      
-        { protocol: 'http', hostname: 'localhost' },        
-        { protocol: 'http', hostname: '127.0.0.1' },        
-    ],
-  },
+    ...(process.env.NODE_ENV === "development" ? {
+      // 🚀 ضروري للموبايل
+      allowedDevOrigins: [
+        "192.168.1.5:3000", 
+        "localhost:3000"
+      ],
+    } : {})
+  }
 };
 
-export default withPWA(nextConfig);
+export default nextConfig;

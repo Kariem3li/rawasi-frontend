@@ -14,16 +14,17 @@ import dynamic from "next/dynamic";
 import imageCompression from 'browser-image-compression';
 import { getFullImageUrl } from "@/lib/config";
 import api from "@/lib/axios"; 
-import axios from 'axios';
-import { useVideoUpload } from "@/components/VideoUploadContext"; // ✅ استدعاء سياق الفيديو
+import { useVideoUpload } from "@/components/VideoUploadContext"; 
+import { uploadSecurelyToCloudinary } from "@/lib/cloudinary";
+import { Category, Feature, LocationInfo } from "@/types";
+import { useAuth } from "@/providers/AuthProvider";
+import toast, { Toaster } from "react-hot-toast";
 
-// تحميل الخريطة بشكل ديناميكي
 const MapPicker = dynamic(() => import("@/components/MapPicker"), { 
     ssr: false, 
     loading: () => <div className="h-[300px] w-full bg-slate-100 animate-pulse rounded-3xl flex items-center justify-center"><Loader2 className="w-8 h-8 text-amber-500 animate-spin"/></div> 
 });
 
-// --- مكون البروجرس بار الفاخر ---
 const ProgressOverlay = ({ progress, message }: { progress: number, message: string }) => {
     const radius = 65;
     const stroke = 8;
@@ -50,7 +51,6 @@ const ProgressOverlay = ({ progress, message }: { progress: number, message: str
     );
 };
 
-// --- دوال مساعدة ---
 const sanitizeNumberInput = (val: string) => val.replace(/[^0-9]/g, '');
 
 const extractCoordsFromUrl = (url: string) => {
@@ -70,8 +70,9 @@ export default function EditProperty() {
     const params = useParams();
     const router = useRouter();
     const listingId = params.id;
+    const { isAuthenticated } = useAuth(); 
 
-    const { startVideoUpload } = useVideoUpload(); // ✅ تفعيل لوجيك الخلفية للفيديو
+    const { startVideoUpload } = useVideoUpload(); 
 
     const [loadingData, setLoadingData] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -81,12 +82,12 @@ export default function EditProperty() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [statusMsg, setStatusMsg] = useState("");
 
-    const [categories, setCategories] = useState<any[]>([]);
-    const [governorates, setGovernorates] = useState<any[]>([]);
-    const [cities, setCities] = useState<any[]>([]);
-    const [zones, setZones] = useState<any[]>([]);
-    const [subdivisions, setSubdivisions] = useState<any[]>([]);
-    const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [governorates, setGovernorates] = useState<LocationInfo[]>([]);
+    const [cities, setCities] = useState<LocationInfo[]>([]);
+    const [zones, setZones] = useState<LocationInfo[]>([]);
+    const [subdivisions, setSubdivisions] = useState<LocationInfo[]>([]);
+    const [dynamicFields, setDynamicFields] = useState<Feature[]>([]);
 
     const [formData, setFormData] = useState({
         offerType: "Sale", category: "", gov: "", city: "", zone: "", subdivision: "",
@@ -95,7 +96,8 @@ export default function EditProperty() {
         plotNumber: "", buildingNumber: "", apartmentNumber: "", floorNumber: "",
         features: {} as Record<string, string>,
         
-        existingImages: [] as any[], deletedImageIds: [] as number[],
+        existingImages: [] as { id: number; image: string }[],
+        deletedImageIds: [] as number[],
         newImages: [] as File[], 
         
         video: null as File | null, existingVideo: null as string | null,
@@ -106,12 +108,19 @@ export default function EditProperty() {
     });
 
     useEffect(() => {
+        if (!isAuthenticated && !loadingData) {
+            router.replace("/login");
+        }
+    }, [isAuthenticated, loadingData, router]);
+
+    useEffect(() => {
+        const controller = new AbortController();
         const initData = async () => {
             try {
                 const [listingRes, catRes, govRes] = await Promise.all([
-                    api.get(`/listings/${listingId}/`),
-                    api.get(`/categories/`),
-                    api.get(`/governorates/`)
+                    api.get(`/listings/${listingId}/`, { signal: controller.signal }),
+                    api.get(`/categories/`, { signal: controller.signal }),
+                    api.get(`/governorates/`, { signal: controller.signal })
                 ]);
 
                 const listing = listingRes.data;
@@ -122,20 +131,20 @@ export default function EditProperty() {
                 setGovernorates(govs);
 
                 if (listing.category?.id) {
-                    const featsRes = await api.get(`/categories/${listing.category.id}/features/`);
+                    const featsRes = await api.get(`/categories/${listing.category.id}/features/`, { signal: controller.signal });
                     setDynamicFields(Array.isArray(featsRes.data) ? featsRes.data : featsRes.data.results || []);
                 }
 
                 if (listing.governorate?.id) {
-                    const cRes = await api.get(`/cities/?governorate=${listing.governorate.id}`);
+                    const cRes = await api.get(`/cities/?governorate=${listing.governorate.id}`, { signal: controller.signal });
                     setCities(Array.isArray(cRes.data) ? cRes.data : cRes.data.results || []);
                 }
                 if (listing.city?.id) {
-                    const zRes = await api.get(`/major-zones/?city=${listing.city.id}`);
+                    const zRes = await api.get(`/major-zones/?city=${listing.city.id}`, { signal: controller.signal });
                     setZones(Array.isArray(zRes.data) ? zRes.data : zRes.data.results || []);
                 }
                 if (listing.major_zone?.id) {
-                    const sRes = await api.get(`/subdivisions/?major_zone=${listing.major_zone.id}`);
+                    const sRes = await api.get(`/subdivisions/?major_zone=${listing.major_zone.id}`, { signal: controller.signal });
                     setSubdivisions(Array.isArray(sRes.data) ? sRes.data : sRes.data.results || []);
                 }
 
@@ -179,19 +188,23 @@ export default function EditProperty() {
                 });
 
                 setLoadingData(false);
-            } catch (error) {
-                console.error(error);
-                alert("حدث خطأ أثناء جلب بيانات العقار. قد يكون غير موجود.");
-                router.push("/my-listings");
+            } catch (error: any) {
+                if (error.name !== 'CanceledError') {
+                    console.error(error);
+                    toast.error("حدث خطأ أثناء جلب بيانات العقار. قد يكون غير موجود.");
+                    router.push("/my-listings");
+                }
             }
         };
-        initData();
-    }, [listingId, router]);
+        if (isAuthenticated) initData();
 
-    const handleChange = (field: string, value: any) => {
+        return () => controller.abort();
+    }, [listingId, router, isAuthenticated]);
+
+    const handleChange = (field: string, value: string | boolean | File | File[] | Record<string, string> | null) => {
         setFormData(prev => {
             const newData = { ...prev, [field]: value };
-            if (field === "googleMapsUrl") {
+            if (field === "googleMapsUrl" && typeof value === "string") {
                 const coords = extractCoordsFromUrl(value);
                 if (coords) { newData.latitude = coords.lat; newData.longitude = coords.lng; }
             }
@@ -201,7 +214,7 @@ export default function EditProperty() {
 
     const handleFeatureInput = (id: string, val: string) => setFormData(p => ({ ...p, features: { ...p.features, [id]: val } }));
     
-    const handleCategoryChange = async (e: any) => {
+    const handleCategoryChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const catId = e.target.value;
         handleChange("category", catId);
         handleChange("features", {}); 
@@ -213,7 +226,7 @@ export default function EditProperty() {
         } else setDynamicFields([]);
     };
 
-    const handleGovChange = async (e: any) => {
+    const handleGovChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const govId = e.target.value;
         handleChange("gov", govId);
         handleChange("city", ""); handleChange("zone", ""); handleChange("subdivision", "");
@@ -222,7 +235,7 @@ export default function EditProperty() {
             setCities(Array.isArray(res.data) ? res.data : res.data.results || []);
         }
     };
-    const handleCityChange = async (e: any) => {
+    const handleCityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const cityId = e.target.value;
         handleChange("city", cityId);
         handleChange("zone", ""); handleChange("subdivision", "");
@@ -231,7 +244,7 @@ export default function EditProperty() {
             setZones(Array.isArray(res.data) ? res.data : res.data.results || []);
         }
     };
-    const handleZoneChange = async (e: any) => {
+    const handleZoneChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const zoneId = e.target.value;
         handleChange("zone", zoneId);
         handleChange("subdivision", "");
@@ -242,24 +255,31 @@ export default function EditProperty() {
     };
 
     const handleMapConfirm = (lat: string, lng: string) => { setFormData({ ...formData, latitude: lat, longitude: lng }); setShowMap(false); };
+    
     const getLocation = () => {
-        if (!navigator.geolocation) return alert("GPS غير مدعوم في متصفحك");
+        if (!navigator.geolocation) return toast.error("GPS غير مدعوم في متصفحك");
         setLocating(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => { setFormData({ ...formData, latitude: pos.coords.latitude.toString(), longitude: pos.coords.longitude.toString() }); setLocating(false); },
-            () => { setLocating(false); alert("فشل تحديد الموقع."); }
+            () => { setLocating(false); toast.error("فشل تحديد الموقع. يرجى تفعيل الـ GPS."); },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } 
         );
     };
 
-    const handleImageUpload = async (e: any) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const files = Array.from(e.target.files) as File[];
+            const files = Array.from(e.target.files);
             setCompressing(true);
             try {
-                const compressedFiles = await Promise.all(files.map(async (file) => {
-                    try { return await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true }); } 
-                    catch { return file; }
-                }));
+                const compressedFiles = await Promise.all(
+                    files.map(async (file) => {
+                        try {
+                            return await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
+                        } catch {
+                            return file;
+                        }
+                    })
+                );
                 setFormData(prev => ({ ...prev, newImages: [...prev.newImages, ...compressedFiles] }));
             } catch (error) { console.error(error); } 
             finally { setCompressing(false); }
@@ -280,35 +300,30 @@ export default function EditProperty() {
         handleChange('newImages', arr);
     };
 
-    const handleVideoUpload = (e: any) => {
+    const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            if (e.target.files[0].size > 500 * 1024 * 1024) return alert("حجم الفيديو كبير! الحد الأقصى 500 ميجابايت.");
-            handleChange('video', e.target.files[0]);
+            if (e.target.files[0].size > 500 * 1024 * 1024) return toast.error("حجم الفيديو كبير! الحد الأقصى 500 ميجابايت.");
+            setFormData(prev => ({ ...prev, video: e.target.files ? e.target.files[0] : null }));
         }
     };
 
-    const handleDocUpload = (e: any, type: 'idCard' | 'contract') => {
-        if (e.target.files) handleChange(type, e.target.files[0]);
-    };
-
-    const uploadDirectToCloudinary = async (file: File, resourceType: 'image' | 'video', onProgress?: (percent: number) => void) => {
-        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "daksg9vcz"; 
-        const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "doh2de38";
-        const data = new FormData();
-        data.append("file", file);
-        data.append("upload_preset", uploadPreset);
-    
-        try {
-            const res = await axios.post(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, data, {
-                onUploadProgress: (e) => { if (e.total && onProgress) onProgress(Math.round((e.loaded * 100) / e.total)); }
-            });
-            return res.data.secure_url;
-        } catch (error) { throw new Error(`فشل رفع الملف`); }
+    const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'idCard' | 'contract') => {
+        if (e.target.files) setFormData(prev => ({ ...prev, [type]: e.target.files ? e.target.files[0] : null }));
     };
 
     const handleSubmit = async () => {
+        if (!isAuthenticated) { router.replace("/login"); return; }
+
+        const totalImages = formData.existingImages.length + formData.newImages.length;
+        if (totalImages === 0) {
+            toast.error("لا يمكن حفظ العقار بدون صور. يرجى إضافة صورة واحدة على الأقل.");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
         if (!formData.category || !formData.gov || !formData.city || !formData.price || !formData.area) {
-            alert("يرجى التأكد من ملء الحقول الأساسية (النوع، الموقع، السعر، المساحة).");
+            toast.error("يرجى التأكد من ملء الحقول الأساسية (النوع، الموقع، السعر، المساحة).");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
 
@@ -316,28 +331,45 @@ export default function EditProperty() {
         setUploadProgress(0);
 
         try {
-            setStatusMsg("جاري معالجة الصور...");
+            let totalUploadTasks = formData.newImages.length + (formData.idCard ? 1 : 0) + (formData.contract ? 1 : 0);
+            let tasksCompleted = 0;
+
+            const updateOverallProgress = (localPercent: number) => {
+                if(totalUploadTasks === 0) return;
+                const overall = ((tasksCompleted * 100) + localPercent) / totalUploadTasks;
+                setUploadProgress(overall * 0.9);
+            };
+
+            setStatusMsg("جاري معالجة ورفع الصور...");
             const uploadedImageUrls = [];
             for (let i = 0; i < formData.newImages.length; i++) {
-                const url = await uploadDirectToCloudinary(formData.newImages[i], 'image', (p) => {
-                    setUploadProgress(Math.round(((i / formData.newImages.length) * 100) + (p / formData.newImages.length)) * 0.9);
-                });
+                const url = await uploadSecurelyToCloudinary(formData.newImages[i], 'image', updateOverallProgress);
                 uploadedImageUrls.push(url);
+                tasksCompleted++;
             }
 
-            setStatusMsg("تحديث الوثائق والبيانات...");
-            let idCardUrl = formData.idCard ? await uploadDirectToCloudinary(formData.idCard, 'image') : "";
-            let contractUrl = formData.contract ? await uploadDirectToCloudinary(formData.contract, 'image') : "";
+            setStatusMsg("تحديث الوثائق والأوراق...");
+            let idCardUrl = formData.existingIdCard;
+            if(formData.idCard) {
+                idCardUrl = await uploadSecurelyToCloudinary(formData.idCard, 'image', updateOverallProgress);
+                tasksCompleted++;
+            }
+
+            let contractUrl = formData.existingContract;
+            if(formData.contract) {
+                contractUrl = await uploadSecurelyToCloudinary(formData.contract, 'image', updateOverallProgress);
+                tasksCompleted++;
+            }
             
             const payload: any = {
                 offer_type: formData.offerType,
-                category: parseInt(formData.category),
-                governorate: parseInt(formData.gov),
-                city: parseInt(formData.city),
+                category: formData.category ? parseInt(formData.category) : null,
+                governorate: formData.gov ? parseInt(formData.gov) : null,
+                city: formData.city ? parseInt(formData.city) : null,
                 major_zone: formData.zone ? parseInt(formData.zone) : null,
                 subdivision: formData.subdivision ? parseInt(formData.subdivision) : null,
-                price: parseFloat(formData.price),
-                area_sqm: parseInt(formData.area),
+                price: formData.price ? parseFloat(formData.price) : 0,
+                area_sqm: formData.area ? parseInt(formData.area) : 0,
                 description: formData.description,
                 is_finance_eligible: formData.isFinanceEligible,
                 latitude: formData.latitude ? parseFloat(formData.latitude) : null,
@@ -345,25 +377,25 @@ export default function EditProperty() {
                 google_maps_url: formData.googleMapsUrl || null,
                 features_data: JSON.stringify(formData.features),
                 deleted_image_ids: formData.deletedImageIds,
-                external_images: uploadedImageUrls,
                 owner_name: formData.ownerName,
                 owner_phone: formData.ownerPhone,
             };
+
+            if(uploadedImageUrls.length > 0) payload.external_images = uploadedImageUrls;
 
             if (formData.floorNumber) payload.floor_number = parseInt(formData.floorNumber);
             if (formData.buildingNumber) payload.building_number = formData.buildingNumber;
             if (formData.apartmentNumber) payload.apartment_number = formData.apartmentNumber;
             
-            if (idCardUrl) payload.external_id_card = idCardUrl;
-            if (contractUrl) payload.external_contract = contractUrl;
+            if (idCardUrl && idCardUrl !== formData.existingIdCard) payload.external_id_card = idCardUrl;
+            if (contractUrl && contractUrl !== formData.existingContract) payload.external_contract = contractUrl;
 
-            // ✅ تحديث الإعلان في دجانجو
+            setStatusMsg("تحديث البيانات في السيرفر...");
             await api.patch(`/listings/${listingId}/`, payload);
 
             setUploadProgress(100);
-            setStatusMsg(formData.video ? "تم تحديث البيانات.. جاري تجهيز الفيديو" : "✅ تم تحديث العقار بنجاح!");
+            setStatusMsg(formData.video ? "تم تحديث البيانات.. جاري تجهيز الفيديو في الخلفية" : "✅ تم تحديث العقار بنجاح!");
 
-            // ✅ لوجيك رفع الفيديو الاحترافي في الخلفية
             if (formData.video) {
                 startVideoUpload(Number(listingId), formData.video);
             }
@@ -372,10 +404,13 @@ export default function EditProperty() {
 
         } catch (error: any) {
             console.error(error);
-            alert("حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.");
+            toast.error("حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى.");
             setSubmitting(false);
+            setUploadProgress(0);
         }
     };
+
+    if (!isAuthenticated && !loadingData) return null;
 
     if (loadingData) {
         return (
@@ -388,11 +423,10 @@ export default function EditProperty() {
 
     return (
         <main className="min-h-screen bg-[#F8FAFC] pb-32 text-slate-800 font-sans dir-rtl">
-            <Navbar />
+            <Toaster position="top-center" reverseOrder={false} /> 
             {submitting && <ProgressOverlay progress={uploadProgress} message={statusMsg} />}
             {showMap && <MapPicker onConfirm={handleMapConfirm} onClose={() => setShowMap(false)} />}
 
-            {/* ✅ الهيدر الاحترافي المطابق لصفحة الإضافة */}
             <div className="bg-slate-900 pt-10 pb-28 px-4 text-center rounded-b-[2.5rem] md:rounded-b-[4rem] relative overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)]">
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent"></div>
                 <div className="relative z-10 flex items-center justify-between max-w-4xl mx-auto px-2">
@@ -400,11 +434,10 @@ export default function EditProperty() {
                         <ArrowRight className="w-4 h-4"/> رجوع
                     </button>
                     <h1 className="text-2xl md:text-3xl font-black text-white tracking-wide">تعديل <span className="text-amber-500">الإعلان</span></h1>
-                    <div className="w-[88px]"></div> {/* للحفاظ على التوسيط */}
+                    <div className="w-[88px]"></div> 
                 </div>
             </div>
 
-            {/* ✅ الحاوية المرفوعة لأعلى (Negative Margin) */}
             <div className="max-w-4xl mx-auto px-4 -mt-16 md:-mt-20 relative z-20 space-y-6 mb-10">
                 
                 {/* 1. التفاصيل الأساسية */}
@@ -439,7 +472,7 @@ export default function EditProperty() {
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2">السعر المطلوب</label>
                             <div className="relative">
-                                <input type="text" inputMode="numeric" className="w-full h-14 border-2 border-gray-200 bg-gray-50 focus:bg-white rounded-2xl pl-12 pr-5 font-black text-lg outline-none focus:border-amber-500 transition" value={formData.price ? Number(formData.price).toLocaleString('ar-EG') : ''} onChange={(e) => handleChange("price", sanitizeNumberInput(e.target.value))} />
+                                <input type="text" inputMode="numeric" pattern="[0-9]*" className="w-full h-14 border-2 border-gray-200 bg-gray-50 focus:bg-white rounded-2xl pl-12 pr-5 font-black text-lg outline-none focus:border-amber-500 transition" value={formData.price ? Number(formData.price).toLocaleString('ar-EG') : ''} onChange={(e) => handleChange("price", sanitizeNumberInput(e.target.value))} />
                                 <span className="absolute left-5 top-1/2 -translate-y-1/2 text-amber-600 font-bold text-sm">ج.م</span>
                             </div>
                         </div>
@@ -486,7 +519,7 @@ export default function EditProperty() {
                                     <div key={feat.id}>
                                         <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wide">{feat.name}</label>
                                         {feat.input_type === 'number' ? (
-                                            <input type="text" inputMode="numeric" value={val} onChange={(e) => handleFeatureInput(feat.id, sanitizeNumberInput(e.target.value))} className="w-full h-12 border-2 border-white bg-white/60 focus:bg-white rounded-xl px-4 font-bold outline-none focus:border-amber-400 shadow-sm" placeholder="أدخل الرقم..." />
+                                            <input type="text" inputMode="numeric" pattern="[0-9]*" value={val} onChange={(e) => handleFeatureInput(feat.id, sanitizeNumberInput(e.target.value))} className="w-full h-12 border-2 border-white bg-white/60 focus:bg-white rounded-xl px-4 font-bold outline-none focus:border-amber-400 shadow-sm" placeholder="أدخل الرقم..." />
                                         ) : feat.input_type === 'bool' ? (
                                             <div className="flex gap-2">
                                                 <button onClick={() => handleFeatureInput(feat.id, "نعم")} className={`flex-1 h-12 rounded-xl border-2 font-bold transition-all active:scale-95 ${val === "نعم" ? "bg-slate-900 text-white border-slate-900" : "bg-white border-white text-gray-500 hover:border-slate-300 shadow-sm"}`}>متوفر</button>
@@ -502,7 +535,7 @@ export default function EditProperty() {
                     </section>
                 )}
 
-                {/* 4. الصور والفيديو (تصميم موحد للحذف) */}
+                {/* 4. الصور والفيديو */}
                 <section className="bg-white p-6 md:p-8 rounded-[2rem] shadow-xl border border-slate-100">
                     <h2 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2"><ImagePlus className="w-5 h-5 text-amber-500"/> ألبوم الصور والفيديو</h2>
                     
@@ -524,15 +557,18 @@ export default function EditProperty() {
                     <div className="mb-6">
                         <p className="text-xs font-bold text-slate-500 mb-3">إضافة صور جديدة</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {formData.newImages.map((img, idx) => (
-                                <div key={idx} className="aspect-square bg-gray-100 rounded-2xl overflow-hidden relative group shadow-sm border border-gray-200">
-                                    <img src={URL.createObjectURL(img)} alt="New" className="w-full h-full object-cover transition duration-300 group-hover:scale-110"/>
-                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-                                    <button type="button" onClick={() => removeNewImage(idx)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 shadow-md active:scale-95 transition-transform">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
+                            {formData.newImages.map((img, idx) => {
+                                const objectUrl = URL.createObjectURL(img);
+                                return (
+                                    <div key={idx} className="aspect-square bg-gray-100 rounded-2xl overflow-hidden relative group shadow-sm border border-gray-200">
+                                        <img src={objectUrl} alt="New" className="w-full h-full object-cover transition duration-300 group-hover:scale-110" onLoad={() => URL.revokeObjectURL(objectUrl)}/>
+                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                        <button type="button" onClick={() => removeNewImage(idx)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 shadow-md active:scale-95 transition-transform">
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )
+                            })}
                             <label className="aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 hover:border-amber-400 transition-colors group">
                                 <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={compressing} />
                                 {compressing ? <Loader2 className="w-10 h-10 text-amber-500 animate-spin"/> : <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform mb-2"><ImagePlus className="w-6 h-6 text-amber-500"/></div>}
@@ -567,7 +603,7 @@ export default function EditProperty() {
                     
                     <div className="grid sm:grid-cols-2 gap-4 mb-8">
                         <div><label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase">الاسم (كما سيظهر)</label><input type="text" className="w-full h-12 border-2 border-gray-200 bg-gray-50 rounded-xl px-4 font-bold text-slate-800 outline-none focus:border-amber-400 focus:bg-white transition" value={formData.ownerName} onChange={(e) => handleChange("ownerName", e.target.value)} /></div>
-                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase">رقم الهاتف (للاتصال والواتساب)</label><input type="text" inputMode="numeric" dir="ltr" className="w-full h-12 border-2 border-gray-200 bg-gray-50 rounded-xl px-4 font-black text-slate-800 outline-none focus:border-amber-400 focus:bg-white transition text-right" value={formData.ownerPhone} onChange={(e) => handleChange("ownerPhone", sanitizeNumberInput(e.target.value))} /></div>
+                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase">رقم الهاتف (للاتصال والواتساب)</label><input type="text" inputMode="numeric" pattern="[0-9]*" dir="ltr" className="w-full h-12 border-2 border-gray-200 bg-gray-50 rounded-xl px-4 font-black text-slate-800 outline-none focus:border-amber-400 focus:bg-white transition text-right" value={formData.ownerPhone} onChange={(e) => handleChange("ownerPhone", sanitizeNumberInput(e.target.value))} /></div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -577,7 +613,6 @@ export default function EditProperty() {
                                 {formData.idCard ? <CheckCircle2 className="w-6 h-6"/> : <User className="w-6 h-6"/>}
                             </div>
                             <span className={`font-black text-sm text-center ${formData.idCard ? 'text-green-700' : 'text-slate-600'}`}>{formData.idCard ? "تم استبدال البطاقة" : formData.existingIdCard ? "تحديث البطاقة" : "إرفاق بطاقة جديدة"}</span>
-                            {formData.existingIdCard && !formData.idCard && <span className="absolute top-4 right-4 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>}
                         </label>
                         <label className={`relative overflow-hidden bg-slate-50 p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group ${formData.contract ? 'border-green-500 bg-green-50/50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-100'}`}>
                             <input type="file" className="hidden" onChange={(e) => handleDocUpload(e, 'contract')} />
@@ -585,7 +620,6 @@ export default function EditProperty() {
                                 {formData.contract ? <CheckCircle2 className="w-6 h-6"/> : <FileText className="w-6 h-6"/>}
                             </div>
                             <span className={`font-black text-sm text-center ${formData.contract ? 'text-green-700' : 'text-slate-600'}`}>{formData.contract ? "تم استبدال العقد" : formData.existingContract ? "تحديث العقد" : "إرفاق عقد جديد"}</span>
-                            {formData.existingContract && !formData.contract && <span className="absolute top-4 right-4 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>}
                         </label>
                     </div>
                 </section>

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, memo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Filter, MapPin, Home, Banknote, Check, RotateCcw, Bed, Bath, Hash, DollarSign, Ruler, LayoutDashboard, Building, KeyRound, Search, Loader2 } from "lucide-react";
+import { 
+    MapPin, Phone, MessageCircle, BadgeCheck, Ruler, CheckCircle2, Check,
+    BedDouble, Bath, Layout, PaintBucket, Dumbbell, Utensils, Zap, Wind, Waves, Trees, Car, Wifi, Snowflake, Tv, ShieldCheck, Home,
+    Layers, Fan, Building, Map, Factory, Warehouse, Store, Filter, X, LayoutDashboard, DollarSign, KeyRound, Banknote, Hash, Search, RotateCcw, Loader2 
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react"; 
 import { useRouter, useSearchParams } from "next/navigation";
-import api from "@/lib/axios"; // ✅ استخدام axios المركزي
+import api from "@/lib/axios"; 
 
+// --- Components Helpers --- (لم يتم تغييرها، فقط نقلتها لتنظيم الكود)
 const FilterSection = ({ title, icon: Icon, children }: any) => (
     <div className="space-y-4 pt-6 border-t border-gray-100 first:border-t-0 first:pt-0">
         <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -25,7 +31,10 @@ const CategoryButton = ({ name, isSelected, onClick, Icon }: any) => (
 
 const NumberSelector = ({ value, onChange }: any) => {
     const [localValue, setLocalValue] = useState(value || "");
-    useEffect(() => { setLocalValue(value || ""); }, [value]);
+    
+    useEffect(() => { 
+        setLocalValue(value || ""); 
+    }, [value]);
 
     const isStandardValue = ["1", "2", "3", "4", "5", "6"].includes(value);
 
@@ -66,13 +75,17 @@ const NumberSelector = ({ value, onChange }: any) => {
                     value={localValue} 
                     onChange={handleInputChange}
                     onBlur={applyFilter}
-                    onKeyDown={(e) => e.key === 'Enter' && applyFilter()}
+                    onKeyDown={(e) => {
+                        if (["e", "E", "+", "-", "."].includes(e.key)) e.preventDefault();
+                        if (e.key === 'Enter') applyFilter();
+                    }}
                 />
             </div>
         </div>
     );
 };
 
+// --- Main Modal Component ---
 export default function AdvancedFiltersModal({ trigger }: any) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -96,10 +109,9 @@ export default function AdvancedFiltersModal({ trigger }: any) {
         dynamicFeatures: {} as Record<string, any>
     });
 
-    // ✅ استخدام axios المركزي بدلاً من fetch
-    const safeFetch = async (endpoint: string) => {
+    const safeFetch = async (endpoint: string, signal?: AbortSignal) => {
         try {
-            const res = await api.get(endpoint);
+            const res = await api.get(endpoint, { signal });
             return Array.isArray(res.data) ? res.data : res.data.results || [];
         } catch { return []; }
     };
@@ -115,69 +127,97 @@ export default function AdvancedFiltersModal({ trigger }: any) {
     useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = 'hidden';
-            const initialize = async () => {
-                setIsLoadingData(true);
-                try {
-                    const [cats, govs] = await Promise.all([
-                        safeFetch(`/categories/`),
-                        safeFetch(`/governorates/`)
-                    ]);
-                    setCategories(cats);
-                    setGovernorates(govs);
+        if (!isOpen) {
+            document.body.style.overflow = '';
+            return;
+        }
 
-                    const currentFilters: any = { ...filters };
-                    const currentDynamic: any = {};
-                    searchParams.forEach((value, key) => {
-                        if (key.startsWith('feat_')) {
-                            const featureId = key.split('_')[1];
-                            currentDynamic[featureId] = value;
-                        } else if (key in filters) {
-                            if (key === 'is_finance_eligible') currentFilters[key] = value === 'true';
-                            else currentFilters[key] = value;
-                        }
-                    });
-                    currentFilters.dynamicFeatures = currentDynamic;
-                    setFilters(currentFilters);
+        document.body.style.overflow = 'hidden';
+        const controller = new AbortController(); // 🚀 1. حماية من تسريب الذاكرة
 
-                    if (currentFilters.category) {
-                        const feats = await safeFetch(`/categories/${currentFilters.category}/features/`);
+        const initialize = async () => {
+            setIsLoadingData(true);
+            try {
+                const [cats, govs] = await Promise.all([
+                    safeFetch(`/categories/`, controller.signal),
+                    safeFetch(`/governorates/`, controller.signal)
+                ]);
+                
+                if (controller.signal.aborted) return;
+
+                setCategories(cats);
+                setGovernorates(govs);
+
+                // قراءة الـ URL
+                const currentFilters: any = { 
+                    offer_type: "", category: "", min_price: "", max_price: "", min_area: "", max_area: "", 
+                    governorate: "", city: "", major_zone: "", subdivision: "", 
+                    is_finance_eligible: false,
+                };
+                const currentDynamic: any = {};
+                
+                searchParams.forEach((value, key) => {
+                    if (key.startsWith('feat_')) {
+                        const featureId = key.replace('feat_', '');
+                        currentDynamic[featureId] = value;
+                    } else if (key in currentFilters) {
+                        if (key === 'is_finance_eligible') currentFilters[key] = value === 'true';
+                        else currentFilters[key] = value;
+                    }
+                });
+                
+                currentFilters.dynamicFeatures = currentDynamic;
+                setFilters(currentFilters);
+
+                // تحميل البيانات المرتبطة
+                if (currentFilters.category) {
+                    const feats = await safeFetch(`/categories/${currentFilters.category}/features/`, controller.signal);
+                    if (!controller.signal.aborted) {
                         setDynamicFeatureFields(feats);
-                        
                         const bed = feats.find((f: any) => f.name.includes("غرف") || f.name.includes("نوم"));
                         const bath = feats.find((f: any) => f.name.includes("حمام"));
                         const floor = feats.find((f: any) => f.name.includes("دور") || f.name.includes("طابق"));
+                        
                         setSpecialIds({ 
                             bedroom: bed ? String(bed.id) : null, 
                             bathroom: bath ? String(bath.id) : null,
                             floor: floor ? String(floor.id) : null
                         });
                     }
+                }
 
-                    if (currentFilters.governorate) {
-                        const citiesData = await safeFetch(`/cities/?governorate=${currentFilters.governorate}`);
-                        setCities(citiesData);
-                        if (currentFilters.city) {
-                            const zonesData = await safeFetch(`/major-zones/?city=${currentFilters.city}`);
-                            setZones(zonesData);
-                            if (currentFilters.major_zone) {
-                                const subsData = await safeFetch(`/subdivisions/?major_zone=${currentFilters.major_zone}`);
-                                setSubdivisions(subsData);
-                            }
+                if (currentFilters.governorate) {
+                    const citiesData = await safeFetch(`/cities/?governorate=${currentFilters.governorate}`, controller.signal);
+                    if (!controller.signal.aborted) setCities(citiesData);
+                    
+                    if (currentFilters.city) {
+                        const zonesData = await safeFetch(`/major-zones/?city=${currentFilters.city}`, controller.signal);
+                        if (!controller.signal.aborted) setZones(zonesData);
+                        
+                        if (currentFilters.major_zone) {
+                            const subsData = await safeFetch(`/subdivisions/?major_zone=${currentFilters.major_zone}`, controller.signal);
+                            if (!controller.signal.aborted) setSubdivisions(subsData);
                         }
                     }
-                } catch (error) { console.error(error); } 
-                finally { setIsLoadingData(false); }
-            };
-            initialize();
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => { document.body.style.overflow = ''; };
+                }
+            } catch (error) { 
+                console.error(error); 
+            } finally { 
+                if (!controller.signal.aborted) setIsLoadingData(false); 
+            }
+        };
+
+        initialize();
+
+        return () => { 
+            controller.abort(); 
+            document.body.style.overflow = ''; 
+        };
     }, [isOpen, searchParams]); 
 
     const handleCategoryChange = async (catId: string) => {
+        if (filters.category === String(catId)) return;
+        
         setFilters(prev => ({ ...prev, category: catId, dynamicFeatures: {} }));
         setDynamicFeatureFields([]);
         setSpecialIds({ bedroom: null, bathroom: null, floor: null });
@@ -205,6 +245,7 @@ export default function AdvancedFiltersModal({ trigger }: any) {
             setCities(citiesData);
         }
     };
+    
     const handleCityChange = async (e: any) => {
         const val = e.target.value;
         setFilters(prev => ({ ...prev, city: val, major_zone: "", subdivision: "" }));
@@ -214,6 +255,7 @@ export default function AdvancedFiltersModal({ trigger }: any) {
             setZones(zonesData);
         }
     };
+    
     const handleZoneChange = async (e: any) => {
         const val = e.target.value;
         setFilters(prev => ({ ...prev, major_zone: val, subdivision: "" }));
@@ -232,35 +274,67 @@ export default function AdvancedFiltersModal({ trigger }: any) {
     };
 
     const applyFilters = () => {
-        const params = new URLSearchParams();
+        const params = new URLSearchParams(searchParams.toString());
+        
+        Object.keys(filters).forEach(key => params.delete(key));
+        params.delete('is_finance_eligible');
+        Array.from(params.keys()).forEach(key => {
+            if (key.startsWith('feat_')) params.delete(key);
+        });
+
         Object.entries(filters).forEach(([key, value]) => {
             if (key === 'dynamicFeatures') return;
-            if (key === 'is_finance_eligible') { if (value === true) params.append(key, 'true'); return; }
-            if (value && value !== "") params.append(key, String(value));
+            if (key === 'is_finance_eligible') { 
+                if (value === true) params.set(key, 'true'); 
+                return; 
+            }
+            if (value && value !== "") params.set(key, String(value));
         });
+        
         Object.entries(filters.dynamicFeatures).forEach(([id, value]) => {
-            if (value && value !== '0' && value !== "") params.append(`feat_${id}`, String(value));
+            if (value && value !== '0' && value !== "") params.set(`feat_${id}`, String(value));
         });
+        
         setIsOpen(false);
-        router.push(`/?${params.toString()}`);
+        // 🚀 2. إضافة scroll: false لمنع القفز المزعج لأعلى الصفحة
+        router.push(`/?${params.toString()}`, { scroll: false });
     };
 
     const resetFilters = () => {
+        const params = new URLSearchParams(searchParams.toString());
+        
+        Object.keys(filters).forEach(key => params.delete(key));
+        params.delete('is_finance_eligible');
+        Array.from(params.keys()).forEach(key => {
+            if (key.startsWith('feat_')) params.delete(key);
+        });
+
         setFilters({ 
             offer_type: "", category: "", min_price: "", max_price: "", min_area: "", max_area: "", 
             governorate: "", city: "", major_zone: "", subdivision: "", 
             is_finance_eligible: false, dynamicFeatures: {} 
         });
         setDynamicFeatureFields([]);
-        router.push('/');
+        
         setIsOpen(false);
+        // 🚀 2. إضافة scroll: false هنا أيضاً
+        router.push(`/?${params.toString()}`, { scroll: false });
+    };
+
+    // 🚀 دالة لمنع الحروف والأرقام السالبة في الحقول الرقمية
+    const handleNumberInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (["e", "E", "+", "-", "."].includes(e.key)) {
+            e.preventDefault();
+        }
     };
 
     return (
         <>
             <div onClick={() => setIsOpen(true)}>{trigger || <button className="bg-slate-900 h-14 w-14 rounded-2xl flex items-center justify-center text-white hover:bg-amber-500 transition-all shadow-lg active:scale-95"><Filter className="w-6 h-6" /></button>}</div>
-            {mounted && isOpen && createPortal(
-                <div className="fixed inset-0 z-[1000000] flex justify-center items-end md:items-center isolate">
+            
+            {/* 🚀 3. التأكد من وجود نافذة المتصفح قبل عمل CreatePortal */}
+            {mounted && isOpen && typeof window !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[1000000] flex justify-center items-end md:items-center isolate dir-rtl">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsOpen(false)}/>
                     <div className="bg-white w-full md:w-[700px] h-[95vh] md:h-auto md:max-h-[90vh] rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-2xl relative z-[1000001] flex flex-col animate-in slide-in-from-bottom duration-300">
                         
@@ -287,7 +361,7 @@ export default function AdvancedFiltersModal({ trigger }: any) {
 
                                     <FilterSection title="نوع العقار" icon={LayoutDashboard}>
                                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                                            {categories.map((cat) => (<CategoryButton key={cat.id} name={cat.name} isSelected={filters.category == cat.id} onClick={() => handleCategoryChange(cat.id)} Icon={getCategoryIcon(cat.name)}/>))}
+                                            {categories.map((cat) => (<CategoryButton key={cat.id} name={cat.name} isSelected={filters.category === String(cat.id)} onClick={() => handleCategoryChange(String(cat.id))} Icon={getCategoryIcon(cat.name)}/>))}
                                         </div>
                                     </FilterSection>
 
@@ -307,15 +381,17 @@ export default function AdvancedFiltersModal({ trigger }: any) {
                                             <div className="space-y-3">
                                                 <label className="text-xs font-bold text-gray-500">السعر (ج.م)</label>
                                                 <div className="flex gap-2">
-                                                    <input type="number" placeholder="الحد الأدنى" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.min_price} onChange={e => setFilters(p => ({...p, min_price: e.target.value}))}/>
-                                                    <input type="number" placeholder="الحد الأقصى" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.max_price} onChange={e => setFilters(p => ({...p, max_price: e.target.value}))}/>
+                                                    {/* 🚀 إضافة onKeyDown لمنع الحروف السالبة */}
+                                                    <input type="number" onKeyDown={handleNumberInputKeyDown} placeholder="الحد الأدنى" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.min_price} onChange={e => setFilters(p => ({...p, min_price: e.target.value}))}/>
+                                                    <input type="number" onKeyDown={handleNumberInputKeyDown} placeholder="الحد الأقصى" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.max_price} onChange={e => setFilters(p => ({...p, max_price: e.target.value}))}/>
                                                 </div>
                                             </div>
                                             <div className="space-y-3">
                                                 <label className="text-xs font-bold text-gray-500">المساحة (م²)</label>
                                                 <div className="flex gap-2">
-                                                    <input type="number" placeholder="من" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.min_area} onChange={e => setFilters(p => ({...p, min_area: e.target.value}))}/>
-                                                    <input type="number" placeholder="إلى" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.max_area} onChange={e => setFilters(p => ({...p, max_area: e.target.value}))}/>
+                                                    {/* 🚀 إضافة onKeyDown لمنع الحروف السالبة */}
+                                                    <input type="number" onKeyDown={handleNumberInputKeyDown} placeholder="من" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.min_area} onChange={e => setFilters(p => ({...p, min_area: e.target.value}))}/>
+                                                    <input type="number" onKeyDown={handleNumberInputKeyDown} placeholder="إلى" className="w-full bg-gray-50 h-12 rounded-xl text-center font-bold text-slate-700 border-2 border-gray-100 focus:border-amber-400 outline-none" value={filters.max_area} onChange={e => setFilters(p => ({...p, max_area: e.target.value}))}/>
                                                 </div>
                                             </div>
                                         </div>
@@ -333,7 +409,7 @@ export default function AdvancedFiltersModal({ trigger }: any) {
                                             <div className="space-y-6">
                                                 {specialIds.bedroom && (
                                                     <div className="space-y-3">
-                                                        <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><Bed className="w-4 h-4 text-amber-500"/> الغرف</label>
+                                                        <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><BedDouble className="w-4 h-4 text-amber-500"/> الغرف</label>
                                                         <NumberSelector value={filters.dynamicFeatures[specialIds.bedroom] || ""} onChange={(v: string) => handleFeatureChange(v, specialIds.bedroom!)} />
                                                     </div>
                                                 )}

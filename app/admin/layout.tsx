@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import AdminGuard from "@/components/AdminGuard";
+import api from "@/lib/axios";
 import { 
   LayoutDashboard, Building, Star, Users, 
   Map, FileText, LogOut, Menu, X 
@@ -11,19 +12,35 @@ import {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter(); // 👈 ضفنا الراوتر
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 🚀 قفل المنيو أوتوماتيك أول ما ننتقل لصفحة تانية (على الموبايل)
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  // 🚀 دالة تسجيل الخروج الحقيقية
+  const handleLogout = () => {
+    // 1. مسح بيانات الدخول
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("is_staff");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("is_staff");
+    
+    // 2. إخبار الـ axios ينسى التوكن
+    delete api.defaults.headers.common["Authorization"];
+    
+    // 3. التوجيه لصفحة الدخول
+    router.push("/login");
+  };
 
   const menuItems = [
     { name: "الرئيسية", icon: LayoutDashboard, path: "/admin" },
     { name: "العقارات", icon: Building, path: "/admin/listings" },
     { name: "الإعلانات المميزة", icon: Star, path: "/admin/promotions" },
     { name: "المناطق الجغرافية", icon: Map, path: "/admin/geography" },
-    { name: "إدارة التنازلات", icon: FileText, path: "/admin/waivers" }, // 👈 ضفناها هنا
+    { name: "إدارة التنازلات", icon: FileText, path: "/admin/waivers" },
     { name: "المستخدمين والإشعارات", icon: Users, path: "/admin/users" },
   ];
 
@@ -31,7 +48,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <AdminGuard>
       <div className="min-h-screen bg-slate-50 flex dir-rtl font-sans">
         
-        {/* 📱 طبقة شفافة ورا المنيو للموبايل (عشان تقفل المنيو لما تدوس بره) */}
         {isMobileMenuOpen && (
           <div 
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in"
@@ -39,7 +55,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
         )}
 
-        {/* 📋 القائمة الجانبية (متوافقة مع الموبايل والشاشات الكبيرة) */}
         <aside className={`fixed inset-y-0 right-0 z-50 w-64 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}`}>
           <div className="h-20 flex items-center justify-between px-6 border-b border-slate-800 shrink-0">
             <div>
@@ -48,7 +63,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </h2>
               <p className="text-[10px] text-slate-400 mt-1 font-bold">لوحة التحكم المركزية</p>
             </div>
-            {/* زرار قفل المنيو للموبايل */}
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors">
               <X className="w-6 h-6" />
             </button>
@@ -56,7 +70,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
             {menuItems.map((item) => {
-              // تظبيط الـ Active State عشان الرئيسية متفضلش منورة على طول
               const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path + '/'));
               return (
                 <Link key={item.path} href={item.path}>
@@ -72,19 +85,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
 
           <div className="p-4 border-t border-slate-800 shrink-0">
-            <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-400 hover:bg-red-500/10 transition-all">
+            {/* 👈 حولنا اللينك لزرار بيشغل دالة تسجيل الخروج */}
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-400 hover:bg-red-500/10 transition-all">
               <LogOut className="w-5 h-5" />
-              <span>العودة للموقع</span>
-            </Link>
+              <span>تسجيل الخروج</span>
+            </button>
           </div>
         </aside>
 
-        {/* 📄 منطقة المحتوى الرئيسية */}
         <main className="flex-1 md:mr-64 flex flex-col min-h-screen w-full">
-          {/* هيدر الموبايل والشاشات */}
           <header className="bg-white h-20 shadow-sm border-b border-gray-100 flex items-center px-4 md:px-8 justify-between sticky top-0 z-30">
              <div className="flex items-center gap-4">
-               {/* زرار فتح المنيو (يظهر في الموبايل بس) */}
                <button 
                  onClick={() => setIsMobileMenuOpen(true)}
                  className="md:hidden p-2.5 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 active:scale-95"

@@ -1,28 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { 
-  ChevronDown, Bed, Bath, DollarSign, Ruler, KeyRound, Building2, Check, X, 
-  Hash, Car, Trees, Wifi, ShieldCheck, Snowflake, Tv, PaintBucket, Dumbbell, Utensils, Zap, Wind, Waves, ArrowUpFromLine, CheckCircle2, Layers, Search
+    MapPin, Phone, MessageCircle, BadgeCheck, Ruler, CheckCircle2, Check, X,
+    BedDouble, Bath, Layout, PaintBucket, Dumbbell, Utensils, Zap, Wind, Waves, Trees, Car, Wifi, Snowflake, Tv, ShieldCheck, Home,
+    Layers, Fan, Building,Building2, Map as MapIcon, Factory, Warehouse, Store, Filter, LayoutDashboard, DollarSign, KeyRound, Banknote, Hash, Search, RotateCcw, Loader2 
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react"; 
 import { useRouter, useSearchParams } from "next/navigation";
-import api from "@/lib/axios"; // ✅ استخدام axios المركزي
+import api from "@/lib/axios"; 
 
-const IconMap: Record<string, any> = {
-    'BedDouble': Bed, 'Bed': Bed, 'Bath': Bath, 'Hash': Hash, 'ArrowUpFromLine': ArrowUpFromLine,
-    'Zap': Zap, 'Wind': Wind, 'Waves': Waves, 'Trees': Trees, 'Car': Car, 'Wifi': Wifi,
-    'ShieldCheck': ShieldCheck, 'Snowflake': Snowflake, 'Tv': Tv, 'Paintbucket': PaintBucket,
-    'Dumbbell': Dumbbell, 'Utensils': Utensils, 'CheckCircle2': CheckCircle2, 'Layers': Layers
+// --- خريطة الأيقونات ---
+const IconsRegistry: Record<string, LucideIcon> = { 
+    ruler: Ruler, area: Ruler, sqm: Ruler,
+    beddouble: BedDouble, bedroom: BedDouble, bedrooms: BedDouble, room: BedDouble, rooms: BedDouble,
+    bath: Bath, bathroom: Bath, bathrooms: Bath, wc: Bath,
+    layout: Layout, floor: Layout, layers: Layers,
+    paintbucket: PaintBucket, finishing: PaintBucket,
+    wifi: Wifi, internet: Wifi,
+    car: Car, parking: Car, garage: Car,
+    dumbbell: Dumbbell, gym: Dumbbell,
+    utensils: Utensils, kitchen: Utensils,
+    shieldcheck: ShieldCheck, security: ShieldCheck,
+    zap: Zap, electricity: Zap,
+    wind: Wind, fan: Fan,
+    snowflake: Snowflake, ac: Snowflake, aircondition: Snowflake,
+    waves: Waves, pool: Waves, trees: Trees, garden: Trees, landscape: Trees,
+    home: Home, building: Building, land: MapIcon, landplot: MapIcon, factory: Factory, warehouse: Warehouse, shop: Store, store: Store,
+    tv: Tv, satellite: Tv,
+    check: CheckCircle2, checkcircle: CheckCircle2
+};
+
+// 🚀 منع إدخال الحروف الغريبة في الأرقام
+const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["e", "E", "+", "-", "."].includes(e.key)) {
+        e.preventDefault();
+    }
 };
 
 const DynamicSelector = ({ value, onChange, options = [], type }: any) => {
     const [localValue, setLocalValue] = useState(value || "");
-    useEffect(() => { setLocalValue(value || ""); }, [value]);
+    
+    useEffect(() => { 
+        setLocalValue(value || ""); 
+    }, [value]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setLocalValue(e.target.value);
-    const applyFilter = () => { if (localValue !== value) onChange(localValue); };
-    const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') applyFilter(); };
+    const isStandardValue = ["1", "2", "3", "4", "5", "6"].includes(value);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setLocalValue(e.target.value.replace(/[^0-9]/g, ''));
+    };
+
+    const applyFilter = () => {
+        if (localValue !== value) onChange(localValue);
+    };
 
     if (type === 'bool') {
         return (
@@ -78,11 +110,14 @@ const DynamicSelector = ({ value, onChange, options = [], type }: any) => {
                         type={type === 'number' ? 'number' : 'text'} 
                         placeholder={type === 'text' ? "مثلاً: سوبر لوكس..." : "مثلاً: 10"} 
                         className={`flex-1 h-14 rounded-xl border-2 text-center text-lg outline-none transition-all font-bold 
-                        ${value && !finalOptions.includes(value) ? 'border-amber-500 bg-white text-amber-600' : 'border-transparent bg-white focus:border-amber-400 text-slate-800 shadow-sm'}`} 
+                        ${value && !isStandardValue ? 'border-amber-500 bg-white text-amber-600' : 'border-transparent bg-white focus:border-amber-400 text-slate-800 shadow-sm'}`} 
                         value={localValue} 
                         onChange={handleInputChange} 
-                        onKeyDown={handleKeyDown} 
                         onBlur={applyFilter} 
+                        onKeyDown={(e) => {
+                            if (type === 'number') handleNumberKeyDown(e);
+                            if (e.key === 'Enter') applyFilter();
+                        }}
                     />
                     <button onClick={applyFilter} className="h-14 w-14 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md shrink-0 hover:bg-amber-500 transition-colors active:scale-95">
                         {type === 'text' ? <Search className="w-6 h-6"/> : <Check className="w-6 h-6"/>}
@@ -95,7 +130,6 @@ const DynamicSelector = ({ value, onChange, options = [], type }: any) => {
     );
 };
 
-// ✅ حل مشكلة النطاقات السعرية (استخدام State بدل DOM)
 const RangeSelector = ({ minVal, maxVal, onApply, onClear, type }: any) => {
     const [min, setMin] = useState(minVal || "");
     const [max, setMax] = useState(maxVal || "");
@@ -110,12 +144,12 @@ const RangeSelector = ({ minVal, maxVal, onApply, onClear, type }: any) => {
             <div className="flex items-center gap-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div className="flex-1 text-center">
                     <label className="text-[10px] text-gray-400 font-bold mb-2 block uppercase tracking-wider">من ({type})</label>
-                    <input type="number" className="w-full bg-white h-12 rounded-xl text-center font-black text-lg text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 border border-gray-100 shadow-sm" value={min} onChange={e => setMin(e.target.value)} placeholder="0" />
+                    <input type="number" onKeyDown={handleNumberKeyDown} className="w-full bg-white h-12 rounded-xl text-center font-black text-lg text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 border border-gray-100 shadow-sm" value={min} onChange={e => setMin(e.target.value)} placeholder="0" />
                 </div>
                 <div className="w-px h-12 bg-gray-200"></div>
                 <div className="flex-1 text-center">
                     <label className="text-[10px] text-gray-400 font-bold mb-2 block uppercase tracking-wider">إلى ({type})</label>
-                    <input type="number" className="w-full bg-white h-12 rounded-xl text-center font-black text-lg text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 border border-gray-100 shadow-sm" value={max} onChange={e => setMax(e.target.value)} placeholder="∞" />
+                    <input type="number" onKeyDown={handleNumberKeyDown} className="w-full bg-white h-12 rounded-xl text-center font-black text-lg text-slate-800 outline-none focus:ring-2 focus:ring-amber-400 border border-gray-100 shadow-sm" value={max} onChange={e => setMax(e.target.value)} placeholder="∞" />
                 </div>
             </div>
             <div className="flex gap-3">
@@ -128,14 +162,26 @@ const RangeSelector = ({ minVal, maxVal, onApply, onClear, type }: any) => {
 
 const FilterPortal = ({ label, icon: Icon, isOpen, onToggle, isActive, children, title }: any) => {
     const [mounted, setMounted] = useState(false);
+    
     useEffect(() => { setMounted(true); }, []);
+
+    useEffect(() => {
+        if (isOpen) document.body.style.overflow = 'hidden';
+        else document.body.style.overflow = '';
+        return () => { document.body.style.overflow = ''; };
+    }, [isOpen]);
+
     const DisplayIcon = Icon || Hash;
 
     return (
         <>
-            <button onClick={onToggle} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all whitespace-nowrap active:scale-95 duration-200 ${isActive ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white border-gray-100 text-slate-600 hover:border-amber-300 hover:text-slate-900'}`}><DisplayIcon className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-gray-400'}`}/>{label}<ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/></button>
-            {mounted && isOpen && createPortal(
-                <div className="fixed inset-0 z-[999999] flex justify-center items-end md:items-center isolate">
+            <button onClick={onToggle} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all whitespace-nowrap active:scale-95 duration-200 ${isActive ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white border-gray-100 text-slate-600 hover:border-amber-300 hover:text-slate-900'}`}>
+                <DisplayIcon className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-gray-400'}`}/>
+                {label}
+            </button>
+            
+            {mounted && isOpen && typeof window !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[999999] flex justify-center items-end md:items-center isolate dir-rtl">
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={onToggle}></div>
                     <div className="bg-white w-full md:w-[500px] rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-2xl fixed bottom-0 md:relative md:bottom-auto z-[1000000] animate-in slide-in-from-bottom duration-300 ease-out flex flex-col max-h-[85vh]">
                         <div className="w-full flex justify-center pt-4 pb-2 md:hidden bg-white cursor-pointer rounded-t-[2.5rem]" onClick={onToggle}><div className="w-14 h-1.5 bg-gray-200 rounded-full"></div></div>
@@ -151,7 +197,8 @@ const FilterPortal = ({ label, icon: Icon, isOpen, onToggle, isActive, children,
     );
 };
 
-export default function QuickFilters() {
+// --- المكون الداخلي اللي بيحتوي على اللوجيك الفعلي ---
+function QuickFiltersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [openFilter, setOpenFilter] = useState<string | null>(null);
@@ -169,9 +216,11 @@ export default function QuickFilters() {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchData = async () => {
         try {
-            const res = await api.get(`/categories/`); // ✅ استخدام axios 
+            const res = await api.get(`/categories/`, { signal: controller.signal }); 
             const catsList = Array.isArray(res.data) ? res.data : res.data.results || [];
             setCategories(catsList);
 
@@ -199,7 +248,7 @@ export default function QuickFilters() {
             }
 
             const groupsArray = Object.entries(groups).map(([name, data]) => ({
-                name, ids: data.ids, icon: IconMap[data.iconName] || Hash, options: Array.from(data.options), type: data.type
+                name, ids: data.ids, icon: IconsRegistry[data.iconName.toLowerCase()] || Hash, options: Array.from(data.options), type: data.type
             }));
 
             groupsArray.sort((a, b) => {
@@ -208,10 +257,14 @@ export default function QuickFilters() {
             });
 
             setFeatureGroups(groupsArray);
-        } catch (e) { console.error(e); } 
+        } catch (e: any) { 
+            if (e.name !== 'CanceledError') console.error(e); 
+        } 
         finally { setLoading(false); }
     };
     fetchData();
+
+    return () => controller.abort();
   }, []);
 
   const updateFilter = (key: string, value: string) => {
@@ -254,8 +307,14 @@ export default function QuickFilters() {
           
           <FilterPortal label={searchParams.get('offer_type') === 'Sale' ? 'للبيع' : searchParams.get('offer_type') === 'Rent' ? 'للإيجار' : 'نوع العرض'} icon={KeyRound} isOpen={openFilter === 'offer'} onToggle={() => setOpenFilter(openFilter === 'offer' ? null : 'offer')} isActive={isActive('offer_type')} title="نوع الصفقة">
               <div className="grid grid-cols-2 gap-3 mb-6">
-                 <button onClick={() => updateFilter('offer_type', 'Sale')} className={`p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 border-2 transition-all duration-200 active:scale-95 ${searchParams.get('offer_type') === 'Sale' ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-xl shadow-amber-500/30' : 'bg-gray-50 text-slate-500 border-gray-100 hover:bg-white hover:border-amber-300'}`}><div className={`p-3 rounded-full ${searchParams.get('offer_type') === 'Sale' ? 'bg-white/30' : 'bg-white shadow-sm'}`}><KeyRound className="w-6 h-6"/></div><span className="text-base">شراء</span></button>
-                 <button onClick={() => updateFilter('offer_type', 'Rent')} className={`p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 border-2 transition-all duration-200 active:scale-95 ${searchParams.get('offer_type') === 'Rent' ? 'bg-indigo-500 text-white border-indigo-500 shadow-xl shadow-indigo-500/30' : 'bg-gray-50 text-slate-500 border-gray-100 hover:bg-white hover:border-indigo-300'}`}><div className={`p-3 rounded-full ${searchParams.get('offer_type') === 'Rent' ? 'bg-white/20' : 'bg-white shadow-sm'}`}><Check className="w-6 h-6"/></div><span className="text-base">إيجار</span></button>
+                 <button onClick={() => updateFilter('offer_type', 'Sale')} className={`p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 border-2 transition-all duration-200 active:scale-95 ${searchParams.get('offer_type') === 'Sale' ? 'bg-amber-500 text-slate-900 border-amber-500 shadow-xl shadow-amber-500/30' : 'bg-gray-50 text-slate-500 border-gray-100 hover:bg-white hover:border-amber-300'}`}>
+                    <div className={`p-3 rounded-full ${searchParams.get('offer_type') === 'Sale' ? 'bg-white/30' : 'bg-white shadow-sm'}`}><KeyRound className="w-6 h-6"/></div>
+                    <span className="text-base">شراء</span>
+                 </button>
+                 <button onClick={() => updateFilter('offer_type', 'Rent')} className={`p-4 rounded-2xl font-black flex flex-col items-center justify-center gap-2 border-2 transition-all duration-200 active:scale-95 ${searchParams.get('offer_type') === 'Rent' ? 'bg-indigo-500 text-white border-indigo-500 shadow-xl shadow-indigo-500/30' : 'bg-gray-50 text-slate-500 border-gray-100 hover:bg-white hover:border-indigo-300'}`}>
+                    <div className={`p-3 rounded-full ${searchParams.get('offer_type') === 'Rent' ? 'bg-white/20' : 'bg-white shadow-sm'}`}><Check className="w-6 h-6"/></div>
+                    <span className="text-base">إيجار</span>
+                 </button>
               </div>
               {isActive('offer_type') && <button onClick={() => updateFilter('offer_type', '')} className="w-full py-4 text-red-500 font-bold bg-red-50 rounded-xl text-sm hover:bg-red-100 transition-colors">إلغاء الفلتر</button>}
           </FilterPortal>
@@ -301,4 +360,17 @@ export default function QuickFilters() {
       </div>
     </div>
   );
+}
+
+// 🚀 الغلاف الأساسي للتصدير
+export default function QuickFilters() {
+    return (
+        <Suspense fallback={
+            <div className="w-full flex gap-3 overflow-x-auto py-2 px-4 no-scrollbar animate-pulse">
+                {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-10 w-24 bg-slate-200 rounded-xl shrink-0"></div>)}
+            </div>
+        }>
+            <QuickFiltersContent />
+        </Suspense>
+    );
 }

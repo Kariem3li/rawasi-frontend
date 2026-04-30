@@ -26,6 +26,7 @@ const getYouTubeEmbedUrl = (url: string) => {
     return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : null;
 };
 
+// ... (IconsRegistry and getIcon functions remain the same)
 const IconsRegistry: Record<string, any> = {
     ruler: Ruler, area: Ruler, sqm: Ruler,
     beddouble: BedDouble, bedroom: BedDouble, bedrooms: BedDouble, room: BedDouble, rooms: BedDouble,
@@ -61,6 +62,21 @@ const getIcon = (iconName: string) => {
     return IconComponent;
 };
 
+// 🚀 دالة ذكية لتنظيف رقم الواتساب (Edge Case Fix)
+const formatWhatsappNumber = (phone: string | undefined | null) => {
+    if (!phone) return null;
+    let cleanPhone = phone.toString().replace(/\D/g, '');
+    // لو الرقم مصري (11 رقم بيبدأ بـ 01)، شيل الصفر وحط 20
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('01')) {
+        cleanPhone = `2${cleanPhone}`;
+    } else if (cleanPhone.length === 10 && cleanPhone.startsWith('1')) {
+        // لو العميل كتبه 10... على طول، حط 20
+        cleanPhone = `20${cleanPhone}`;
+    }
+    return `https://wa.me/${cleanPhone}`;
+};
+
+
 export default function ListingClient({ listing }: { listing: any }) {
   const [showLightbox, setShowLightbox] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -70,13 +86,24 @@ export default function ListingClient({ listing }: { listing: any }) {
     trackEvent('VIEW', 'listing', listing.id);
   }, [listing.id]);
 
+  // 🚀 إخفاء السكرول الأساسي للصفحة لما الـ Lightbox يفتح عشان الـ BottomNav ميضربش
+  useEffect(() => {
+      if (showLightbox || showMapLightbox) {
+          document.body.style.overflow = 'hidden';
+      } else {
+          document.body.style.overflow = 'unset';
+      }
+      return () => { document.body.style.overflow = 'unset'; };
+  }, [showLightbox, showMapLightbox]);
+
+
   const allImages = [listing.thumbnail, ...(listing.images?.map((img: any) => img.image) || [])].filter(Boolean);
   const uniqueImages = [...new Set(allImages)];
 
   const rawPhone = listing.owner_phone || listing.agent?.phone_number;
   const rawWhatsapp = listing.owner_phone || listing.agent?.phone_number || listing.agent?.whatsapp_link;
   
-  const whatsappLink = rawWhatsapp ? `https://wa.me/2${rawWhatsapp.toString().replace(/\D/g, '')}` : null;
+  const whatsappLink = formatWhatsappNumber(rawWhatsapp);
   const phoneLink = rawPhone ? `tel:${rawPhone.toString().replace(/\D/g, '')}` : null;
   const youtubeEmbed = getYouTubeEmbedUrl(listing.youtube_url);
 
@@ -91,7 +118,7 @@ export default function ListingClient({ listing }: { listing: any }) {
       } catch (error) { console.log('Error sharing:', error); }
     } else {
       await navigator.clipboard.writeText(window.location.href);
-      alert("تم نسخ الرابط الحافظة!");
+      alert("تم نسخ الرابط للحافظة!");
     }
   };
 
@@ -126,9 +153,11 @@ export default function ListingClient({ listing }: { listing: any }) {
                 pagination={{ type: 'fraction', el: '.custom-fraction' }}
                 navigation={{ nextEl: '.next-img', prevEl: '.prev-img' }}
                 className="w-full h-full cursor-pointer"
+                onSlideChange={(swiper) => setActiveImageIndex(swiper.activeIndex)}
                 onClick={() => setShowLightbox(true)}
              >
                 {uniqueImages.map((img, idx) => (
+                    // 🚀 إضافة relative صريحة للـ Slide عشان الـ fill يشتغل صح 100%
                     <SwiperSlide key={idx} className="relative w-full h-full">
                         <Image 
                             src={getFullImageUrl(img as string)}
@@ -136,13 +165,12 @@ export default function ListingClient({ listing }: { listing: any }) {
                             fill
                             className="object-cover"
                             priority={idx === 0} 
-                            sizes="100vw"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/20 to-transparent opacity-90 pointer-events-none"></div>
                     </SwiperSlide>
                 ))}
 
-                {/* ✅ التعديل السحري هنا: استخدمنا ! لمنع Swiper من إخفاء العداد */}
                 <div className="absolute !bottom-14 !right-4 md:!right-6 !left-auto !w-auto min-w-[70px] flex items-center justify-center z-20 bg-black/50 backdrop-blur-md text-white font-bold text-xs px-4 py-2 rounded-full custom-fraction tracking-widest border border-white/10 shadow-lg"></div>
              </Swiper>
          ) : (
@@ -151,7 +179,6 @@ export default function ListingClient({ listing }: { listing: any }) {
              </div>
          )}
          
-         {/* ✅ تم رفع زرار المفضلة ليكون متناسق مع العداد */}
          <div className="absolute bottom-14 left-4 md:left-6 z-30">
             <div className="bg-black/50 backdrop-blur-md p-2.5 rounded-full border border-white/10 shadow-lg">
                 <FavoriteButton listingId={listing.id} isInitialFavorite={listing.is_favorite} />
@@ -199,6 +226,15 @@ export default function ListingClient({ listing }: { listing: any }) {
                     <span className="w-1.5 h-6 bg-amber-500 rounded-full"></span> تفاصيل الوحدة
                 </h3>
                 <p className="text-slate-600 text-sm md:text-base leading-relaxed whitespace-pre-line font-medium">{listing.description}</p>
+                
+                {listing.custom_map_image && (
+                    <button 
+                        onClick={() => setShowMapLightbox(true)}
+                        className="mt-6 flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 font-black rounded-xl hover:bg-indigo-100 transition border border-indigo-100 active:scale-95"
+                    >
+                        <Layout className="w-5 h-5"/> عرض المخطط الهندسي (Floor Plan)
+                    </button>
+                )}
             </div>
 
             {/* المميزات (Dynamic Features) */}
@@ -251,7 +287,6 @@ export default function ListingClient({ listing }: { listing: any }) {
                                 className="absolute inset-0 w-full h-full border-0"
                              />
                         ) : (
-                            // ✅ التعديل السحري للايفون هنا (playsInline و preload)
                             <video 
                                 controls 
                                 playsInline 
@@ -273,18 +308,38 @@ export default function ListingClient({ listing }: { listing: any }) {
                     <h3 className="font-black text-lg text-slate-900 mb-4 flex items-center gap-2">
                        <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span> الموقع على الخريطة
                     </h3>
-                    <div className="h-64 w-full rounded-3xl overflow-hidden shadow-inner border border-gray-200 relative group">
+                    <div className="h-64 w-full rounded-3xl overflow-hidden shadow-inner border border-gray-200 relative group mb-4">
                         <iframe 
                            title={listing.title}
                            width="100%" height="100%" frameBorder="0" scrolling="no"
+                           // 🚀 تأكد من صحة الرابط ده (شيل الصفر اللي كان قبل الـ query لو عامل مشكلة)
                            src={`https://maps.google.com/maps?q=${listing.latitude},${listing.longitude}&hl=ar&z=15&output=embed`}
-                           className="grayscale group-hover:grayscale-0 transition duration-700" 
+                           className="grayscale group-hover:grayscale-0 transition duration-700 absolute inset-0 w-full h-full" 
                            loading="lazy"
                         ></iframe>
                     </div>
-                    <a href={`https://maps.google.com/maps?q=${listing.latitude},${listing.longitude}`} target="_blank" className="mt-4 flex justify-center items-center gap-2 w-full py-4 bg-blue-50 text-blue-700 rounded-2xl font-black text-sm hover:bg-blue-100 transition active:scale-95 border border-blue-100">
-                        <MapPin className="w-5 h-5"/> فتح في Google Maps
-                    </a>
+                    
+                    {/* 🚀 الأزرار الجديدة: Grid عشان يكونوا جنب بعض */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${listing.latitude},${listing.longitude}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex justify-center items-center gap-2 w-full py-4 bg-blue-50 text-blue-700 rounded-2xl font-black text-sm hover:bg-blue-100 transition active:scale-95 border border-blue-100"
+                        >
+                            <MapPin className="w-5 h-5"/> فتح في Google Maps
+                        </a>
+                        
+                        {/* 🚀 زرار OpenStreetMap (التقسيمات) */}
+                        <a 
+                            href={`https://www.openstreetmap.org/?mlat=${listing.latitude}&mlon=${listing.longitude}#map=17/${listing.latitude}/${listing.longitude}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="flex justify-center items-center gap-2 w-full py-4 bg-amber-50 text-amber-700 rounded-2xl font-black text-sm hover:bg-amber-100 transition active:scale-95 border border-amber-100"
+                        >
+                            <Map className="w-5 h-5"/> الخريطة التفصيلية (التقسيمات)
+                        </a>
+                    </div>
                 </div>
             )}
         </div>
@@ -297,7 +352,7 @@ export default function ListingClient({ listing }: { listing: any }) {
                 className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base transition-all active:scale-95 ${phoneLink && listing.status !== 'Sold' ? 'bg-white text-slate-900 hover:bg-gray-100' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
                  <Phone className="w-5 h-5" /> اتصال
              </a>
-             <a href={whatsappLink || '#'} target="_blank" onClick={(e) => { if(!whatsappLink || listing.status === 'Sold') e.preventDefault(); else trackEvent('WHATSAPP', 'listing', listing.id); }} 
+             <a href={whatsappLink || '#'} target="_blank" rel="noopener noreferrer" onClick={(e) => { if(!whatsappLink || listing.status === 'Sold') e.preventDefault(); else trackEvent('WHATSAPP', 'listing', listing.id); }} 
                 className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base transition-all active:scale-95 ${whatsappLink && listing.status !== 'Sold' ? 'bg-[#25D366] text-white hover:brightness-105 shadow-[0_0_15px_rgba(37,211,102,0.4)]' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
                  <MessageCircle className="w-5 h-5" /> واتساب
              </a>
@@ -307,7 +362,7 @@ export default function ListingClient({ listing }: { listing: any }) {
       {/* 🔍 نافذة عرض الصور بكامل الشاشة (Lightbox) */}
       {showLightbox && (
           <div className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-md flex flex-col justify-center animate-in fade-in duration-300">
-              <button onClick={() => setShowLightbox(false)} className="absolute top-6 right-6 z-50 bg-white/10 border border-white/20 text-white p-3 rounded-full hover:bg-white/20 transition active:scale-95"><X className="w-6 h-6"/></button>
+              <button onClick={() => setShowLightbox(false)} className="absolute top-6 right-6 z-[999999] bg-white/10 border border-white/20 text-white p-3 rounded-full hover:bg-white/20 transition active:scale-95"><X className="w-6 h-6"/></button>
               
               <div className="flex-1 relative w-full h-full">
                   <Swiper
@@ -318,9 +373,17 @@ export default function ListingClient({ listing }: { listing: any }) {
                     className="w-full h-full"
                   >
                      {uniqueImages.map((img, idx) => (
-                        <SwiperSlide key={idx} className="flex items-center justify-center">
-                            <div className="relative w-full h-full md:w-[80vw] md:h-[90vh]">
-                                <Image src={getFullImageUrl(img as string)} alt="صورة مكبرة" fill className="object-contain" sizes="100vw" />
+                        <SwiperSlide key={idx} className="flex items-center justify-center relative">
+                            {/* 🚀 استخدام un-optimized image مؤقتاً في اللايتبوكس لو الصور مقاساتها غريبة، أو استخدام fill مع object-contain */}
+                            <div className="relative w-full h-full md:w-[90vw] md:h-[90vh]">
+                                <Image 
+                                   src={getFullImageUrl(img as string)} 
+                                   alt="صورة مكبرة" 
+                                   fill 
+                                   className="object-contain" 
+                                   sizes="100vw" 
+                                   priority={idx === activeImageIndex}
+                                />
                             </div>
                         </SwiperSlide>
                      ))}
@@ -335,9 +398,9 @@ export default function ListingClient({ listing }: { listing: any }) {
       {/* 🗺️ نافذة المخطط الهندسي */}
       {showMapLightbox && listing.custom_map_image && (
           <div className="fixed inset-0 z-[99999] bg-white/95 backdrop-blur-xl flex flex-col justify-center animate-in fade-in duration-300">
-              <button onClick={() => setShowMapLightbox(false)} className="absolute top-6 right-6 z-50 bg-gray-100 text-slate-800 p-3 rounded-full hover:bg-gray-200 transition shadow-lg active:scale-95"><X className="w-6 h-6"/></button>
+              <button onClick={() => setShowMapLightbox(false)} className="absolute top-6 right-6 z-[999999] bg-gray-100 text-slate-800 p-3 rounded-full hover:bg-gray-200 transition shadow-lg active:scale-95"><X className="w-6 h-6"/></button>
               <div className="flex-1 relative flex items-center justify-center p-4 md:p-12">
-                  <Image src={getFullImageUrl(listing.custom_map_image)} alt="المخطط الهندسي" fill className="object-contain" />
+                  <Image src={getFullImageUrl(listing.custom_map_image)} alt="المخطط الهندسي" fill className="object-contain" sizes="100vw" />
               </div>
               <p className="text-center text-slate-500 font-bold pb-10">المخطط الهندسي للوحدة</p>
           </div>

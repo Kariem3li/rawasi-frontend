@@ -1,106 +1,106 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import { 
   Loader2, PhoneIcon, Lock, Briefcase, ChevronDown, 
-  User, ShieldCheck, MessageCircle, UserPlus, Eye, EyeOff, AlertCircle,
-  CheckCircle2
+  User, ShieldCheck, MessageCircle, UserPlus, Eye, EyeOff 
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
+import { useContactInfo } from "@/lib/useContactInfo";
+import Cookies from "js-cookie";
+import toast, { Toaster } from "react-hot-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useAuth } from "@/providers/AuthProvider";
+// 🚀 Zod Schema بضمان تطابق الباسورد والتحقق الكامل
+const registerSchema = z.object({
+  firstName: z.string().min(2, "الاسم الأول قصير جداً"),
+  lastName: z.string().min(2, "الاسم الأخير قصير جداً"),
+  clientType: z.enum(["Buyer", "Seller", "Marketer", "Investor"]),
+  phone: z.string().regex(/^01[0125][0-9]{8}$/, "رقم هاتف مصري غير صالح"),
+  password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+  confirmPassword: z.string()
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "كلمات المرور غير متطابقة",
+  path: ["confirmPassword"], // لإظهار الإيرور تحت حقل التأكيد
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const router = useRouter();
-  
-  const [formData, setFormData] = useState({
-    firstName: "", 
-    lastName: "",
-    phone: "", 
-    password: "", 
-    confirmPassword: "",
-    clientType: "Buyer"
-  });
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const { contactInfo } = useContactInfo();
+  const { login } = useAuth(); // 👈 2. استدعاء دالة الـ login من البروفايدر
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  const [contactInfo, setContactInfo] = useState({ support_phone: "", whatsapp_number: "" });
+  const [isSuccess, setIsSuccess] = useState(false);
 
-  useEffect(() => {
-    const fetchContactInfo = async () => {
-        try {
-            const res = await api.get('/contact-info/');
-            setContactInfo(res.data);
-        } catch (error) { console.error("Failed to fetch contact info"); }
-    };
-    fetchContactInfo();
-  }, []);
+  const { 
+      register, 
+      handleSubmit, 
+      formState: { errors, isSubmitting } 
+  } = useForm<RegisterFormValues>({
+      resolver: zodResolver(registerSchema),
+      defaultValues: { clientType: "Buyer" }
+  });
 
-  const handleChange = (e: any) => {
-      setFormData({ ...formData, [e.target.name]: e.target.value });
-      if (error) setError("");
-  };
+  const onSubmit = async (data: RegisterFormValues) => {
+      try {
+          // 1. التسجيل
+          await api.post('/auth/register/', { 
+              first_name: data.firstName,
+              last_name: data.lastName,
+              phone_number: data.phone,
+              password: data.password,
+              client_type: data.clientType
+          });
 
-  const handleRegister = async () => {
-    setError("");
+          // 2. الدخول التلقائي
+          const loginRes = await api.post("/auth/login/", {
+              phone_number: data.phone,
+              password: data.password
+          });
+          const token = loginRes.data.token;
+          const fullName = `${data.firstName} ${data.lastName}`;
 
-    if (!formData.firstName || !formData.lastName || !formData.phone || !formData.password) {
-        setError("يرجى ملء جميع الحقول المطلوبة.");
-        return;
-    }
+          // 🚀 3. تحديث الـ Global State والـ Headers (زي صفحة اللوجين بالظبط)
+          login(token, fullName, false, false); // isStaff = false, rememberMe = false
+          api.defaults.headers.common['Authorization'] = `Token ${token}`;
+          // حفظ التوكن بأمان
+          Cookies.set("token", loginRes.data.token, { 
+              secure: process.env.NODE_ENV === "production",
+              sameSite: "strict" 
+          });
+          localStorage.setItem("username", `${data.firstName} ${data.lastName}`);
 
-    if (formData.password !== formData.confirmPassword) {
-        setError("كلمتا المرور غير متطابقتين.");
-        return;
-    }
+          setIsSuccess(true);
+          toast.success("تم إنشاء الحساب بنجاح! جاري تحويلك...");
+          
+          setTimeout(() => {
+              router.push("/");
+          }, 1500);
 
-    if (formData.password.length < 6) {
-        setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل.");
-        return;
-    }
-
-    setLoading(true);
-
-    try {
-        await api.post('/auth/users/', {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            phone_number: formData.phone,
-            password: formData.password,
-            client_type: formData.clientType
-        });
-
-        setSuccess(true);
-        setTimeout(() => {
-            router.push("/login");
-        }, 2000);
-
-    } catch (err: any) {
-        if (err.response && err.response.data) {
-            const errorData = err.response.data;
-            if (errorData.phone_number) {
-                setError("رقم الهاتف هذا مسجل بالفعل.");
-            } else if (errorData.password) {
-                setError(errorData.password[0]);
-            } else {
-                setError("حدث خطأ أثناء التسجيل، تأكد من صحة البيانات.");
-            }
-        } else {
-            setError("فشل الاتصال بالخادم. يرجى المحاولة لاحقاً.");
-        }
-    } finally {
-        setLoading(false);
-    }
+      } catch (err: any) {
+          const errorData = err.response?.data;
+          let errorMessage = "حدث خطأ أثناء التسجيل، تأكد من صحة البيانات.";
+          
+          if (errorData?.phone_number) {
+              errorMessage = "رقم الهاتف هذا مسجل بالفعل.";
+          } else if (errorData?.password) {
+              errorMessage = errorData.password[0];
+          }
+          
+          toast.error(errorMessage);
+      }
   };
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans dir-rtl relative pb-10">
-      <Navbar />
+      <Toaster position="top-center" reverseOrder={false} />
       
       {/* خلفية جمالية */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
@@ -119,21 +119,7 @@ export default function Register() {
                 <p className="text-slate-500 text-sm font-bold">انضم لمجتمع رواسي وابدأ رحلتك العقارية</p>
             </div>
 
-            {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 flex items-center gap-3 border border-red-100 animate-in zoom-in duration-300 shadow-sm">
-                    <AlertCircle className="w-5 h-5 shrink-0" />
-                    <p className="text-sm font-black">{error}</p>
-                </div>
-            )}
-
-            {success && (
-                <div className="bg-green-50 text-green-700 p-4 rounded-2xl mb-6 flex items-center gap-3 border border-green-200 animate-in zoom-in duration-300 shadow-sm">
-                    <CheckCircle2 className="w-6 h-6 shrink-0" />
-                    <p className="text-sm font-black">تم إنشاء الحساب بنجاح! جاري تحويلك لتسجيل الدخول...</p>
-                </div>
-            )}
-
-            <div className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 
                 {/* نوع الحساب */}
                 <div>
@@ -141,10 +127,8 @@ export default function Register() {
                     <div className="relative">
                         <Briefcase className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <select 
-                            name="clientType"
                             className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-12 pl-12 font-black text-slate-800 outline-none transition-all shadow-sm appearance-none cursor-pointer"
-                            value={formData.clientType}
-                            onChange={handleChange}
+                            {...register("clientType")}
                         >
                             <option value="Buyer">مشتري / أبحث عن عقار</option>
                             <option value="Seller">مالك / بائع</option>
@@ -161,15 +145,17 @@ export default function Register() {
                         <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">الاسم الأول</label>
                         <div className="relative">
                             <User className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input type="text" name="firstName" className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-10 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm" placeholder="أحمد" value={formData.firstName} onChange={handleChange} />
+                            <input type="text" className={`w-full h-14 bg-gray-50 border-2 focus:bg-white rounded-2xl pr-10 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm ${errors.firstName ? 'border-red-500' : 'border-transparent focus:border-amber-500'}`} placeholder="أحمد" {...register("firstName")} />
                         </div>
+                        {errors.firstName && <p className="text-red-500 text-xs font-bold mt-1">{errors.firstName.message}</p>}
                     </div>
                     <div>
                         <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">الاسم الأخير</label>
                         <div className="relative">
                             <User className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input type="text" name="lastName" className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-10 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm" placeholder="محمد" value={formData.lastName} onChange={handleChange} />
+                            <input type="text" className={`w-full h-14 bg-gray-50 border-2 focus:bg-white rounded-2xl pr-10 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm ${errors.lastName ? 'border-red-500' : 'border-transparent focus:border-amber-500'}`} placeholder="محمد" {...register("lastName")} />
                         </div>
+                        {errors.lastName && <p className="text-red-500 text-xs font-bold mt-1">{errors.lastName.message}</p>}
                     </div>
                 </div>
 
@@ -178,8 +164,9 @@ export default function Register() {
                     <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">رقم الهاتف (سيكون اسم الدخول)</label>
                     <div className="relative">
                         <PhoneIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input type="tel" dir="ltr" name="phone" className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-12 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm text-right" placeholder="010XXXXXXXX" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/[^0-9]/g, '')})} />
+                        <input type="tel" dir="ltr" className={`w-full h-14 bg-gray-50 border-2 focus:bg-white rounded-2xl pr-12 pl-4 font-black text-slate-800 outline-none transition-all shadow-sm text-right ${errors.phone ? 'border-red-500' : 'border-transparent focus:border-amber-500'}`} placeholder="010XXXXXXXX" {...register("phone")} />
                     </div>
+                    {errors.phone && <p className="text-red-500 text-xs font-bold mt-1">{errors.phone.message}</p>}
                 </div>
 
                 {/* كلمات المرور */}
@@ -188,33 +175,35 @@ export default function Register() {
                         <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">كلمة المرور</label>
                         <div className="relative">
                             <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input type={showPassword ? "text" : "password"} name="password" className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-10 pl-10 font-black text-slate-800 outline-none transition-all shadow-sm" placeholder="••••••••" value={formData.password} onChange={handleChange} />
+                            <input type={showPassword ? "text" : "password"} className={`w-full h-14 bg-gray-50 border-2 focus:bg-white rounded-2xl pr-10 pl-10 font-black text-slate-800 outline-none transition-all shadow-sm dir-ltr text-left ${errors.password ? 'border-red-500' : 'border-transparent focus:border-amber-500'}`} placeholder="••••••••" {...register("password")} />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-500 transition-colors p-1">
                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
+                        {errors.password && <p className="text-red-500 text-xs font-bold mt-1">{errors.password.message}</p>}
                     </div>
                     <div>
                         <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">تأكيد كلمة المرور</label>
                         <div className="relative">
                             <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input type={showConfirmPassword ? "text" : "password"} name="confirmPassword" className="w-full h-14 bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl pr-10 pl-10 font-black text-slate-800 outline-none transition-all shadow-sm" placeholder="••••••••" value={formData.confirmPassword} onChange={handleChange} />
+                            <input type={showConfirmPassword ? "text" : "password"} className={`w-full h-14 bg-gray-50 border-2 focus:bg-white rounded-2xl pr-10 pl-10 font-black text-slate-800 outline-none transition-all shadow-sm dir-ltr text-left ${errors.confirmPassword ? 'border-red-500' : 'border-transparent focus:border-amber-500'}`} placeholder="••••••••" {...register("confirmPassword")} />
                             <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-500 transition-colors p-1">
                                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
+                        {errors.confirmPassword && <p className="text-red-500 text-xs font-bold mt-1">{errors.confirmPassword.message}</p>}
                     </div>
                 </div>
 
                 <button 
-                    onClick={handleRegister}
-                    disabled={loading || success}
+                    type="submit"
+                    disabled={isSubmitting || isSuccess}
                     className="w-full bg-slate-900 text-white h-14 rounded-2xl font-black text-lg shadow-[0_10px_20px_rgba(0,0,0,0.15)] hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95 flex items-center justify-center gap-2 mt-6 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
                 >
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <UserPlus className="w-6 h-6 ml-1" />}
-                    {loading ? "جاري التسجيل..." : "إنشاء حساب"}
+                    {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <UserPlus className="w-6 h-6 ml-1" />}
+                    {isSubmitting ? "جاري التسجيل..." : "إنشاء حساب"}
                 </button>
-            </div>
+            </form>
 
             <div className="mt-8 text-center border-t border-gray-100 pt-6">
                 <p className="text-sm text-slate-500 font-bold">

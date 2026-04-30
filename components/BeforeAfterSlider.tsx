@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { ChevronsLeftRight } from 'lucide-react';
 import Image from 'next/image';
 
@@ -11,50 +11,51 @@ interface Props {
 }
 
 export default function BeforeAfterSlider({ beforeImage, afterImage, title }: Props) {
-    const [sliderPosition, setSliderPosition] = useState(50);
     const [isDragging, setIsDragging] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    
+    // 🚀 السحر هنا: استخدام Refs بدل State لتحريك العناصر لمنع الـ Re-renders المستمرة
+    const overlayRef = useRef<HTMLDivElement>(null);
+    const handleRef = useRef<HTMLDivElement>(null);
 
-    // ✅ دالة التحريك المحسنة
+    // ✅ دالة التحريك المحسنة (Zero-Lag)
     const handleMove = useCallback((clientX: number) => {
-        if (containerRef.current) {
+        if (containerRef.current && overlayRef.current && handleRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
             // حساب النسبة المئوية بدقة ومنع الخروج عن الإطار
             const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
             const percent = Math.max(0, Math.min((x / rect.width) * 100, 100));
-            setSliderPosition(percent);
+            
+            // 🚀 تعديل الـ DOM مباشرة للسرعة القصوى (بدون React State Re-renders)
+            // استخدام requestAnimationFrame لضمان سلاسة الـ Animation مع رفرش الشاشة
+            requestAnimationFrame(() => {
+                if (overlayRef.current) {
+                    overlayRef.current.style.clipPath = `polygon(0 0, ${percent}% 0, ${percent}% 100%, 0 100%)`;
+                }
+                if (handleRef.current) {
+                    handleRef.current.style.left = `${percent}%`;
+                }
+            });
         }
     }, []);
 
-    // ✅ استخدام Pointer Events لدعم الماوس واللمس (Touch) في نفس الوقت
-    const onPointerDown = (e: React.PointerEvent) => {
+    const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         setIsDragging(true);
+        // نأمر المتصفح يركز كل أحداث الماوس/اللمس على العنصر ده حتى لو خرج براه
+        e.currentTarget.setPointerCapture(e.pointerId);
         handleMove(e.clientX);
     };
 
-    const onPointerMove = (e: React.PointerEvent) => {
+    const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
         if (!isDragging) return;
         handleMove(e.clientX);
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
         setIsDragging(false);
+        // تحرير الماوس لما العميل يشيل صباعه
+        e.currentTarget.releasePointerCapture(e.pointerId);
     };
-
-    // ✅ حل مشكلة تعليق الماوس إذا خرج خارج المكون
-    useEffect(() => {
-        if (isDragging) {
-            window.addEventListener('pointerup', onPointerUp);
-            window.addEventListener('pointercancel', onPointerUp);
-        } else {
-            window.removeEventListener('pointerup', onPointerUp);
-            window.removeEventListener('pointercancel', onPointerUp);
-        }
-        return () => {
-            window.removeEventListener('pointerup', onPointerUp);
-            window.removeEventListener('pointercancel', onPointerUp);
-        };
-    }, [isDragging]);
 
     return (
         <div className="w-full">
@@ -65,7 +66,8 @@ export default function BeforeAfterSlider({ beforeImage, afterImage, title }: Pr
                 className="relative w-full aspect-[4/3] md:aspect-video rounded-2xl overflow-hidden cursor-ew-resize select-none shadow-inner border border-slate-200 group touch-none"
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
-                // منع تفاعل المتصفح الافتراضي مع الصور (تجنب السحب الخاطئ)
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp} // لو حصل أي مقاطعة
                 onDragStart={(e) => e.preventDefault()}
             >
                 {/* الصورة الثانية (بعد) - الخلفية */}
@@ -83,10 +85,10 @@ export default function BeforeAfterSlider({ beforeImage, afterImage, title }: Pr
                 </div>
 
                 {/* الصورة الأولى (قبل) - فوق الصورة الثانية مقصوصة */}
-                {/* ✅ استخدام clip-path لأداء صاروخي بدل تغيير العرض */}
                 <div 
+                    ref={overlayRef} // 🚀 ربطنا الـ Ref هنا
                     className="absolute inset-0 z-10 pointer-events-none"
-                    style={{ clipPath: `polygon(0 0, ${sliderPosition}% 0, ${sliderPosition}% 100%, 0 100%)` }}
+                    style={{ clipPath: `polygon(0 0, 50% 0, 50% 100%, 0 100%)` }} // القيمة الابتدائية
                 >
                     <Image 
                         src={beforeImage} 
@@ -104,8 +106,9 @@ export default function BeforeAfterSlider({ beforeImage, afterImage, title }: Pr
 
                 {/* شريط السحب (الخط والمقبض) */}
                 <div 
-                    className="absolute top-0 bottom-0 z-20 w-1 bg-white shadow-[0_0_15px_rgba(0,0,0,0.5)] pointer-events-none"
-                    style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
+                    ref={handleRef} // 🚀 ربطنا الـ Ref هنا
+                    className="absolute top-0 bottom-0 z-20 w-1 bg-white shadow-[0_0_15px_rgba(0,0,0,0.5)] pointer-events-none -translate-x-1/2"
+                    style={{ left: `50%` }} // القيمة الابتدائية
                 >
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xl border-2 border-amber-500 transform transition-transform group-hover:scale-110">
                         <ChevronsLeftRight className="w-5 h-5 text-amber-500" />

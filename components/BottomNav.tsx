@@ -4,12 +4,16 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Heart, User, Plus, Building2, LogIn, X } from "lucide-react";
+// 🚀 1. استدعاء الـ Hook
+import { useAuth } from "@/providers/AuthProvider"; 
 
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   
-  // 👈 خليت الحالة الافتراضية null بدل 0 (عشان منورش الرئيسية بالغلط)
+  // 🚀 2. سحب حالة تسجيل الدخول
+  const { isAuthenticated } = useAuth();
+  
   const [active, setActive] = useState<number | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -24,16 +28,11 @@ export default function BottomNav() {
     { name: "حسابي", href: "/profile", icon: User, protected: true },
   ], []);
 
-  // 👈 دالة التحديد بقت أذكى
   useEffect(() => {
     const index = Menus.findIndex((item) => {
-        // الرئيسية لازم تطابق 100%
         if (item.href === '/') return pathname === '/';
-        // باقي الصفحات ممكن تطابق البداية (زي /profile/settings)
         return pathname.startsWith(item.href);
     });
-    
-    // لو لقاها هينورها، لو ملقاهاش هيفصل النور خالص (زي صفحة /waivers)
     setActive(index !== -1 ? index : null);
   }, [pathname, Menus]);
 
@@ -47,9 +46,8 @@ export default function BottomNav() {
 
   const handleNavClick = (e: React.MouseEvent, index: number, menu: any) => {
     if (menu.protected) {
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-        
-        if (!token) {
+        // 🚀 3. التحقق مباشرة من الـ Context بدل الـ localStorage
+        if (!isAuthenticated) {
             e.preventDefault(); 
             setPendingRoute(menu.href);
             setShowAuthModal(true);
@@ -66,9 +64,8 @@ export default function BottomNav() {
 
   if (!mounted) return null;
 
-  // 👈 لو مش active على حاجة (زي صفحة التنازلات)، هنوقف حسابات المنحنى
   const isAnyActive = active !== null;
-  const safeActive = active ?? 0; // للحسابات فقط عشان مديش إيرور
+  const safeActive = active ?? 0; 
 
   const itemWidth = windowWidth / 5;
   const center = (4 - safeActive) * itemWidth + (itemWidth / 2);
@@ -76,53 +73,24 @@ export default function BottomNav() {
   const depth = 38;      
   const R = 30;          
 
-  // 👈 لو مفيش حاجة منورة، هنرسم مستطيل سادة بدون منحنى
   const path = isAnyActive ? `
-    M0,${R}                         
-    Q0,0 ${R},0                     
-    L${center - curveWidth},0       
-    C${center - curveWidth * 0.5},0 ${center - curveWidth * 0.35},${depth} ${center},${depth} 
-    C${center + curveWidth * 0.35},${depth} ${center + curveWidth * 0.5},0 ${center + curveWidth},0 
-    L${windowWidth - R},0           
-    Q${windowWidth},0 ${windowWidth},${R} 
-    L${windowWidth},80              
-    L0,80                           
-    Z                               
+    M0,${R} Q0,0 ${R},0 L${center - curveWidth},0 C${center - curveWidth * 0.5},0 ${center - curveWidth * 0.35},${depth} ${center},${depth} C${center + curveWidth * 0.35},${depth} ${center + curveWidth * 0.5},0 ${center + curveWidth},0 L${windowWidth - R},0 Q${windowWidth},0 ${windowWidth},${R} L${windowWidth},80 L0,80 Z                               
   ` : `
-    M0,${R}                         
-    Q0,0 ${R},0
-    L${windowWidth - R},0           
-    Q${windowWidth},0 ${windowWidth},${R} 
-    L${windowWidth},80              
-    L0,80                           
-    Z
+    M0,${R} Q0,0 ${R},0 L${windowWidth - R},0 Q${windowWidth},0 ${windowWidth},${R} L${windowWidth},80 L0,80 Z
   `;
 
   return (
     <>
         <div className="md:hidden fixed bottom-0 w-full z-40 drop-shadow-[0_-8px_20px_rgba(0,0,0,0.05)] animate-in slide-in-from-bottom-5 duration-500" dir="rtl">
         
-        <svg 
-            className="w-full h-20 fill-white" 
-            width={windowWidth} 
-            height="80"
-            viewBox={`0 0 ${windowWidth} 80`}
-            preserveAspectRatio="none"
-        >
-            <path 
-                d={path} 
-                className="transition-[d] duration-500 ease-[cubic-bezier(0.5,0,0.1,1.1)]" 
-            />
+        <svg className="w-full h-20 fill-white" width={windowWidth} height="80" viewBox={`0 0 ${windowWidth} 80`} preserveAspectRatio="none">
+            <path d={path} className="transition-[d] duration-500 ease-[cubic-bezier(0.5,0,0.1,1.1)]" />
         </svg>
 
         <div className="absolute top-0 left-0 w-full h-full">
-            {/* ✅ إخفاء الدائرة لو مفيش عنصر منور */}
             <div 
                 className={`absolute -top-[24px] w-14 h-14 rounded-full flex justify-center items-center z-20 bg-amber-500 shadow-lg shadow-amber-500/40 border-[3px] border-white transition-all duration-500 ${isAnyActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0 pointer-events-none'}`}
-                style={{
-                    left: `${center - 28}px`, 
-                    transition: "left 0.5s cubic-bezier(0.5, 0, 0.1, 1.1), opacity 0.3s, transform 0.3s",
-                }}
+                style={{ left: `${center - 28}px`, transition: "left 0.5s cubic-bezier(0.5, 0, 0.1, 1.1), opacity 0.3s, transform 0.3s" }}
             >
                 {isAnyActive && (
                     <span className="text-slate-900 animate-in zoom-in duration-300 transform scale-110">
@@ -136,28 +104,11 @@ export default function BottomNav() {
                 const isActive = i === active;
                 return (
                 <li key={i} className="relative h-full flex-1 group">
-                    <Link
-                        href={menu.href}
-                        className="flex flex-col items-center justify-center h-full w-full cursor-pointer pb-1"
-                        onClick={(e) => handleNavClick(e, i, menu)}
-                    >
-                    <span
-                        className={`absolute top-6 transition-all duration-500 ease-out
-                        ${isActive 
-                            ? "opacity-0 translate-y-8 scale-50" 
-                            : "opacity-100 translate-y-0 scale-100 text-slate-400 group-hover:text-amber-500 group-hover:-translate-y-1"}
-                        `}
-                    >
+                    <Link href={menu.href} className="flex flex-col items-center justify-center h-full w-full cursor-pointer pb-1" onClick={(e) => handleNavClick(e, i, menu)}>
+                    <span className={`absolute top-6 transition-all duration-500 ease-out ${isActive ? "opacity-0 translate-y-8 scale-50" : "opacity-100 translate-y-0 scale-100 text-slate-400 group-hover:text-amber-500 group-hover:-translate-y-1"}`}>
                         <menu.icon size={26} strokeWidth={1.5} />
                     </span>
-
-                    <span
-                        className={`absolute bottom-3 text-[11px] font-black transition-all duration-500 ease-out
-                        ${isActive 
-                            ? "opacity-100 translate-y-0 text-amber-600 delay-100" 
-                            : "opacity-0 translate-y-4 text-transparent"}
-                        `}
-                    >
+                    <span className={`absolute bottom-3 text-[11px] font-black transition-all duration-500 ease-out ${isActive ? "opacity-100 translate-y-0 text-amber-600 delay-100" : "opacity-0 translate-y-4 text-transparent"}`}>
                         {menu.name}
                     </span>
                     </Link>
@@ -170,41 +121,16 @@ export default function BottomNav() {
 
         {showAuthModal && (
             <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4">
-                <div 
-                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
-                    onClick={() => setShowAuthModal(false)}
-                ></div>
-
+                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowAuthModal(false)}></div>
                 <div className="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl relative z-10 animate-in zoom-in duration-300 border border-gray-100">
-                    <button 
-                        onClick={() => setShowAuthModal(false)}
-                        className="absolute top-5 right-5 text-gray-400 hover:text-red-500 transition bg-gray-50 p-1.5 rounded-full"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-
+                    <button onClick={() => setShowAuthModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-red-500 transition bg-gray-50 p-1.5 rounded-full"><X className="w-5 h-5" /></button>
                     <div className="text-center mt-2">
-                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5 text-amber-600 shadow-inner">
-                            <LogIn className="w-8 h-8 ml-1" />
-                        </div>
+                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5 text-amber-600 shadow-inner"><LogIn className="w-8 h-8 ml-1" /></div>
                         <h3 className="text-xl font-black text-slate-900 mb-2">تسجيل الدخول مطلوب</h3>
-                        <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                            للمتابعة واستخدام هذه الميزة، يرجى تسجيل الدخول إلى حسابك أو إنشاء حساب جديد.
-                        </p>
-                        
+                        <p className="text-gray-500 text-sm mb-8 leading-relaxed">للمتابعة واستخدام هذه الميزة، يرجى تسجيل الدخول إلى حسابك.</p>
                         <div className="flex gap-3">
-                            <button 
-                                onClick={handleLoginRedirect}
-                                className="flex-1 bg-amber-500 text-slate-900 font-black py-3.5 rounded-xl hover:bg-amber-400 transition shadow-lg shadow-amber-500/20 active:scale-95"
-                            >
-                                دخول
-                            </button>
-                            <button 
-                                onClick={() => setShowAuthModal(false)}
-                                className="flex-1 bg-gray-100 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-gray-200 transition active:scale-95"
-                            >
-                                إلغاء
-                            </button>
+                            <button onClick={handleLoginRedirect} className="flex-1 bg-amber-500 text-slate-900 font-black py-3.5 rounded-xl hover:bg-amber-400 transition shadow-lg shadow-amber-500/20 active:scale-95">دخول</button>
+                            <button onClick={() => setShowAuthModal(false)} className="flex-1 bg-gray-100 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-gray-200 transition active:scale-95">إلغاء</button>
                         </div>
                     </div>
                 </div>

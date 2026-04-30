@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import api from "@/lib/axios";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/providers/AuthProvider"; 
+import toast from "react-hot-toast";
 
 // الذاكرة العالمية: مزامنة القلوب في الموقع بالكامل
 export const globalFavStore = new Map<string, boolean>();
@@ -15,7 +17,8 @@ interface FavoriteButtonProps {
 
 export default function FavoriteButton({ listingId, isInitialFavorite }: FavoriteButtonProps) {
   const router = useRouter();
-  const pathname = usePathname(); // لمعرفة المسار الحالي
+  const pathname = usePathname(); 
+  const { isAuthenticated } = useAuth(); 
   const idStr = String(listingId);
   
   const [isFavorite, setIsFavorite] = useState<boolean>(() => {
@@ -24,25 +27,27 @@ export default function FavoriteButton({ listingId, isInitialFavorite }: Favorit
   });
   
   const [isAnimating, setIsAnimating] = useState(false);
-  const isProcessing = useRef(false); // ✅ حماية ضد الـ Spam Clicks
+  const [isProcessing, setIsProcessing] = useState(false); 
+  
+  // 🚀 1. استخدام Ref للوجيك عشان ميتأثرش بذاكرة الرياكت (يمنع الضغط المزدوج بامتياز)
+  const processingRef = useRef(false);
 
-  // تحديث محلي لو الذاكرة اتغيرت
   useEffect(() => {
       const currentVal = globalFavStore.get(idStr);
-      if (currentVal !== undefined && currentVal !== isFavorite) {
-          setIsFavorite(currentVal);
-      } else if (currentVal === undefined) {
+      if (currentVal !== undefined) {
+          setIsFavorite((prev) => prev !== currentVal ? currentVal : prev);
+      } else {
           globalFavStore.set(idStr, isInitialFavorite);
-          setIsFavorite(isInitialFavorite);
+          setIsFavorite((prev) => prev !== isInitialFavorite ? isInitialFavorite : prev);
       }
   }, [idStr, isInitialFavorite]);
 
-  // الاستماع للأزرار التانية
   useEffect(() => {
     const syncFavorite = (e: any) => {
         if (String(e.detail.listingId) === idStr) {
-            setIsFavorite(e.detail.isFavorite);
-            globalFavStore.set(idStr, e.detail.isFavorite);
+            const newValue = e.detail.isFavorite;
+            setIsFavorite(newValue);
+            globalFavStore.set(idStr, newValue);
         }
     };
     
@@ -54,68 +59,74 @@ export default function FavoriteButton({ listingId, isInitialFavorite }: Favorit
     e.preventDefault(); 
     e.stopPropagation(); 
 
-    // ✅ لو الزرار بيحمل حالياً، نمنع الضغط المتكرر
-    if (isProcessing.current) return; 
+    // الاعتماد على الـ Ref هنا بيحل مشكلة الـ Stale Closure تماماً
+    if (processingRef.current) return; 
 
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
-        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+    if (!isAuthenticated) {
+        sessionStorage.setItem('redirectAfterLogin', pathname);
         router.push("/login");
         return;
     }
 
-    isProcessing.current = true; // قفل الزرار مؤقتاً
-    const newState = !isFavorite;
+    processingRef.current = true;
+    setIsProcessing(true); 
     
-    // ✅ تحديث فوري وسلس (بدون أي رفريش للشاشة)
-    setIsFavorite(newState);
-    globalFavStore.set(idStr, newState);
-    
-    setIsAnimating(true);
-    setTimeout(() => setIsAnimating(false), 300);
+    // 🚀 2. استخدام (prev) عشان دايماً يجيب أحدث حالة بدون ما نعتمد على المتغير الخارجي
+    setIsFavorite((prev) => {
+        const newState = !prev; // عكس الحالة الحالية دايماً
+        globalFavStore.set(idStr, newState);
+        
+        setIsAnimating(true);
+        setTimeout(() => setIsAnimating(false), 300);
 
-    window.dispatchEvent(new CustomEvent('favoriteToggled', {
-        detail: { listingId: idStr, isFavorite: newState }
-    }));
+        window.dispatchEvent(new CustomEvent('favoriteToggled', {
+            detail: { listingId: idStr, isFavorite: newState }
+        }));
+
+        return newState;
+    });
 
     try {
         await api.post('/favorites/toggle/', { listing_id: listingId });
-        
-        // ✅ سحر الأداء: لو إحنا جوه صفحة المفضلة بس، نعمل رفريش عشان العقار يختفي/يظهر
-        if (pathname === '/saved' || pathname === '/favorites') {
-             router.refresh(); 
-        }
     } catch (error) {
-        // تراجع فوري لو حصل خطأ في السيرفر
-        setIsFavorite(!newState);
-        globalFavStore.set(idStr, !newState);
-        window.dispatchEvent(new CustomEvent('favoriteToggled', {
-            detail: { listingId: idStr, isFavorite: !newState }
-        }));
+        // التراجع في حالة الخطأ
+        setIsFavorite((prev) => {
+            const rollbackState = !prev;
+            globalFavStore.set(idStr, rollbackState);
+            
+            window.dispatchEvent(new CustomEvent('favoriteToggled', {
+                detail: { listingId: idStr, isFavorite: rollbackState }
+            }));
+            
+            return rollbackState;
+        });
         console.error("Favorite Error:", error);
+        toast.error("فشل التحديث، تأكد من الاتصال بالإنترنت."); 
     } finally {
-        isProcessing.current = false; // فتح الزرار تاني
+        processingRef.current = false;
+        setIsProcessing(false);
     }
-  }, [listingId, idStr, isFavorite, router, pathname]); 
+  // 🚀 3. مصفوفة نظيفة جداً ومفيهاش أي متغير بيعمل Re-create
+  }, [listingId, idStr, router, isAuthenticated, pathname]); 
 
   return (
         <button 
             onClick={handleToggleFavorite}
-            disabled={isProcessing.current}
+            disabled={isProcessing}
             aria-label={isFavorite ? "إزالة من المفضلة" : "إضافة للمفضلة"}
-            className="group relative flex items-center justify-center p-2.5 rounded-full bg-white/80 backdrop-blur-md shadow-[0_4px_15px_rgba(0,0,0,0.08)] hover:bg-white border border-gray-100 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className={`group relative flex items-center justify-center p-2.5 rounded-full bg-white/90 backdrop-blur-md shadow-sm border border-gray-200 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-amber-500/50 hover:border-red-200 ${isProcessing ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-md'}`}
         >
             {isAnimating && isFavorite && (
-                <span className="absolute inset-0 rounded-full bg-red-400 opacity-50 animate-ping"></span>
+                <span className="absolute inset-0 rounded-full bg-red-400 opacity-60 animate-ping duration-300 pointer-events-none"></span>
             )}
             
             <Heart 
                 className={`w-5 h-5 transition-all duration-300 ${
                     isFavorite 
-                    ? 'fill-red-500 text-red-500 scale-110 drop-shadow-[0_2px_8px_rgba(239,68,68,0.4)]' 
-                    : 'text-gray-400 group-hover:text-red-400 group-hover:scale-105'
+                    ? 'fill-red-500 text-red-500 scale-110 drop-shadow-[0_2px_6px_rgba(239,68,68,0.5)]' 
+                    : 'text-slate-400 group-hover:text-red-400 group-hover:scale-105'
                 } ${isAnimating ? 'scale-125' : ''}`}
-                strokeWidth={2} 
+                strokeWidth={isFavorite ? 1.5 : 2} 
             />
         </button>
     );

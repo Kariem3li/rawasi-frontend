@@ -1,77 +1,51 @@
 import { Metadata, ResolvingMetadata } from 'next';
 import ListingClient from './ListingClient'; 
 import { API_URL, getFullImageUrl } from "@/lib/config";
-import { Home, AlertTriangle } from 'lucide-react';
-import Link from 'next/link';
+import { notFound } from 'next/navigation'; // 🚀 استدعاء ضروري للـ SEO
 
-// ✅ 1. التعديل الأول: تعريف الـ params كـ Promise ليتوافق مع Next.js 15
-type Props = {
-  params: Promise<{ id: string }>
+type Props = { params: Promise<{ id: string }> }
+
+// 🚀 1. دالة موحدة لمنع الـ Double Fetch وتخفيف الضغط على السيرفر
+async function getListingData(id: string) {
+    try {
+        // 🚀 2. استخدام ISR بدل no-store (الصفحة تفتح طلقة وتتحدث كل 60 ثانية)
+        const res = await fetch(`${API_URL}/listings/${id}/`, { 
+            next: { revalidate: 60 } 
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (error) {
+        console.error("Error fetching listing:", error);
+        return null;
+    }
 }
 
-// دالة الـ SEO (تحسين جلب البيانات لمحركات البحث)
-export async function generateMetadata(
-  { params }: Props,
-  parent: ResolvingMetadata
-): Promise<Metadata> {
-  
-  // ✅ 2. التعديل الثاني: فك تشفير الـ params قبل استخدامها
+// دالة الـ SEO
+export async function generateMetadata({ params }: Props, parent: ResolvingMetadata): Promise<Metadata> {
   const resolvedParams = await params;
-  const id = resolvedParams.id;
+  const product = await getListingData(resolvedParams.id);
   
-  try {
-    const res = await fetch(`${API_URL}/listings/${id}/`);
-    if (!res.ok) throw new Error("Not Found");
-    const product = await res.json();
-    
-    return {
+  if (!product) return { title: 'عقار غير متوفر | رواسي للعقارات' };
+
+  return {
       title: `${product.title} | ${Number(product.price).toLocaleString('ar-EG')} ج.م`,
       description: product.description?.substring(0, 160) || 'شاهد تفاصيل هذا العقار المميز على رواسي للعقارات...',
       openGraph: {
-        images: product.thumbnail ? [getFullImageUrl(product.thumbnail)] : [],
-        title: product.title,
-        description: product.description?.substring(0, 100),
+          images: product.thumbnail ? [getFullImageUrl(product.thumbnail)] : [],
+          title: product.title,
+          description: product.description?.substring(0, 100),
       },
-    }
-  } catch (e) {
-    return { title: 'عقار غير متوفر | رواسي للعقارات' }
   }
 }
 
 // الصفحة الرئيسية (Server Component)
 export default async function ListingPage({ params }: Props) {
-  
-  // ✅ 3. التعديل الثالث: فك التشفير هنا كمان عشان نبعت الرقم الحقيقي للسيرفر
   const resolvedParams = await params;
-  const id = resolvedParams.id;
-  
-  let listingData = null;
-  
-  try {
-      const res = await fetch(`${API_URL}/listings/${id}/`, { cache: 'no-store' }); 
-      if (res.ok) {
-          listingData = await res.json();
-      }
-  } catch (error) {
-      console.error("Error fetching listing:", error);
-  }
+  const listingData = await getListingData(resolvedParams.id);
 
-  // تصميم 404 بريميوم لو العقار اتباع أو اتحذف
+  // 🚀 3. استخدام notFound عشان جوجل ميأرشفش صفحة الخطأ
   if (!listingData) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] px-4 text-center">
-            <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-inner border border-red-100">
-                <AlertTriangle className="w-10 h-10" />
-            </div>
-            <h1 className="text-3xl font-black text-slate-900 mb-3">عفواً، العقار غير متاح 😔</h1>
-            <p className="text-slate-500 mb-8 font-bold max-w-md leading-relaxed">
-                يبدو أن هذا العقار قد تم بيعه أو إيقافه بواسطة المالك. يمكنك استكشاف المزيد من العقارات المميزة لدينا.
-            </p>
-            <Link href="/" className="bg-amber-500 text-slate-900 font-black px-8 py-4 rounded-2xl hover:bg-amber-400 transition-all shadow-[0_10px_20px_rgba(245,158,11,0.2)] active:scale-95 flex items-center gap-2">
-                <Home className="w-5 h-5" /> العودة للرئيسية
-            </Link>
-        </div>
-      );
+      notFound(); 
   }
 
   return <ListingClient listing={listingData} />;

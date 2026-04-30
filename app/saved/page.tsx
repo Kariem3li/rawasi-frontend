@@ -1,81 +1,100 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
-import BottomNav from "@/components/BottomNav";
-import { useState, useEffect, useCallback } from "react";
+import BottomNav from "@/components/BottomNav"; 
+import { useState, useEffect } from "react";
 import { Loader2, Heart, MapPin, DollarSign, Trash2, Eye, Bed, Bath, Search } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getFullImageUrl } from "@/lib/config";
 import api from "@/lib/axios";
-import { globalFavStore } from "@/components/FavoriteButton"; // ✅ استدعاء الذاكرة العالمية
+import { globalFavStore } from "@/components/FavoriteButton"; 
+import { useAuth } from "@/providers/AuthProvider";
+import toast from "react-hot-toast";
 
 export default function SavedListings() {
   const router = useRouter();
+  const { isAuthenticated } = useAuth(); 
+
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchFavorites = useCallback(async () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-
-    if (!token) { 
-        router.push('/login'); 
-        return; 
-    }
-
-    try {
-      const res = await api.get('/favorites/');
-      const data = res.data;
-      const results = Array.isArray(data) ? data : data.results || [];
-      setListings(results);
-    } catch (error) {
-      console.error("Error fetching favorites:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+  // 🚀 حماية הـ Route
+  useEffect(() => {
+      if (!isAuthenticated && !loading) {
+          router.replace("/login");
+      }
+  }, [isAuthenticated, loading, router]);
 
   useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
+    const controller = new AbortController();
+
+    const fetchFavorites = async () => {
+      try {
+        const res = await api.get('/favorites/', { signal: controller.signal });
+        const data = res.data;
+        const results = Array.isArray(data) ? data : data.results || [];
+        
+        // 🚀 تنظيف البيانات الميتة (لو العقار اتحذف من الداتا بيز بس لسه في المفضلة)
+        const validListings = results.filter((fav: any) => fav.listing || fav.id);
+        setListings(validListings);
+        
+      } catch (error: any) {
+        if (error.name !== 'CanceledError' && error.response?.status !== 401) {
+            console.error("Error fetching favorites:", error);
+            toast.error("حدث خطأ أثناء جلب المفضلة");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+        fetchFavorites();
+    }
+
+    return () => controller.abort(); 
+  }, [isAuthenticated]);
   
   const handleRemoveFavorite = async (listingId: number) => {
-    // 1. تحديث الواجهة فوراً (Optimistic UI)
+    // 1. Optimistic UI
     const oldListings = [...listings];
     setListings(prev => prev.filter(item => {
         const actualListing = item.listing || item;
         return actualListing.id !== listingId;
     }));
 
-    // ✅ 2. السحر هنا: نحدث الذاكرة العالمية ونبلغ كل زراير القلوب في الموقع تطفي!
+    // 2. تحديث الذاكرة العالمية
     globalFavStore.set(String(listingId), false);
     window.dispatchEvent(new CustomEvent('favoriteToggled', {
         detail: { listingId: String(listingId), isFavorite: false }
     }));
 
     try {
-      // 3. إرسال الإزالة للسيرفر
       await api.post('/favorites/toggle/', { listing_id: listingId });
-      router.refresh();
+      toast.success("تم الإزالة من المفضلة");
     } catch (error) {
-      // إرجاع العنصر في حال فشل الاتصال وإرجاع الذاكرة لحالتها
+      // 3. Rollback in case of error
       setListings(oldListings);
       globalFavStore.set(String(listingId), true);
       window.dispatchEvent(new CustomEvent('favoriteToggled', {
           detail: { listingId: String(listingId), isFavorite: true }
       }));
-      alert("فشل الإزالة. تأكد من اتصالك بالإنترنت.");
+      toast.error("فشل الإزالة. تأكد من اتصالك بالإنترنت."); 
     }
   };
 
+  if (!isAuthenticated && !loading) return null;
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><Loader2 className="animate-spin text-red-500 w-10 h-10"/></div>;
+
+  // 🚀 نحسب العدد الفعلي للعقارات الصالحة مش مجرد عناصر الـ Array
+  const validItemsCount = listings.filter(fav => fav.listing || fav.id).length;
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] pb-32 font-sans dir-rtl">
-      <Navbar />
-
-      {/* الهيدر الفخم */}
+      {/* الهيدر הפخم */}
       <div className="bg-slate-900 text-white pt-24 pb-20 px-4 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[80px] pointer-events-none"></div>
         
@@ -85,14 +104,14 @@ export default function SavedListings() {
                 قائمة المفضلة
             </h1>
             <p className="text-slate-400 text-sm md:text-base font-bold">
-                تحتفظ بـ <span className="text-white font-black px-1">{listings.length}</span> إعلانات مميزة
+                تحتفظ بـ <span className="text-white font-black px-1">{validItemsCount}</span> إعلانات مميزة
             </p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 -mt-12 relative z-20">
         
-        {listings.length === 0 ? (
+        {validItemsCount === 0 ? (
             <div className="text-center py-20 bg-white rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center animate-in fade-in zoom-in duration-500">
                 <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
                     <Heart className="w-12 h-12 text-red-300" />
@@ -111,12 +130,12 @@ export default function SavedListings() {
 
                     return (
                         <div 
-                            key={item.id} 
+                            key={`fav-${favItem.id || index}-${item.id}`} // 🚀 مفتاح فريد جداً يمنع تعارض الـ React
                             className="bg-white p-3 md:p-4 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 transition-all hover:shadow-lg group animate-in slide-in-from-bottom duration-500"
                             style={{ animationDelay: `${index * 100}ms` }}
                         >
                             {/* صورة العقار */}
-                            <div className="w-full md:w-56 h-48 md:h-full bg-slate-100 rounded-xl overflow-hidden shrink-0 relative block">
+                            <Link href={`/listings/${item.id}`} className="w-full md:w-56 h-48 md:h-full bg-slate-100 rounded-xl overflow-hidden shrink-0 relative block cursor-pointer">
                                 <Image 
                                     src={getFullImageUrl(item.thumbnail || item.image) || "/images/placeholder-property.jpg"} 
                                     alt={item.title || "عقار"}
@@ -128,12 +147,14 @@ export default function SavedListings() {
                                     <DollarSign className="w-3.5 h-3.5 text-amber-500"/>
                                     {item.offer_type === 'Sale' ? 'بيع' : 'إيجار'}
                                 </div>
-                            </div>
+                            </Link>
 
                             {/* تفاصيل العقار */}
                             <div className="flex-1 flex flex-col justify-between">
                                 <div>
-                                    <h3 className="font-black text-slate-900 text-lg md:text-xl line-clamp-1 mb-2 group-hover:text-amber-600 transition-colors">{item.title}</h3>
+                                    <Link href={`/listings/${item.id}`}>
+                                        <h3 className="font-black text-slate-900 text-lg md:text-xl line-clamp-1 mb-2 group-hover:text-amber-600 transition-colors cursor-pointer">{item.title}</h3>
+                                    </Link>
                                     
                                     <div className="text-xs text-gray-500 flex items-center gap-1.5 font-bold mb-4">
                                         <MapPin className="w-4 h-4 text-slate-400"/> 
@@ -153,9 +174,10 @@ export default function SavedListings() {
                                         )}
                                     </div>
 
-                                    <div className="font-black text-slate-900 text-2xl mb-4">
+                                    {/* 🚀 Semantic HTML change */}
+                                    <p className="font-black text-slate-900 text-2xl mb-4">
                                         {item.price ? Number(item.price).toLocaleString('ar-EG') : "غير محدد"} <span className="text-sm font-bold text-gray-400">ج.م</span>
-                                    </div>
+                                    </p>
                                 </div>
 
                                 {/* أزرار الإجراءات */}

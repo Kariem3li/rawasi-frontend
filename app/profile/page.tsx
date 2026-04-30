@@ -8,13 +8,15 @@ import ListingCard from "@/components/ListingCard";
 import { 
     User, Heart, Building2, Loader2, 
     MessageCircle, LogOut, Save, BadgeCheck, 
-    Briefcase, Phone, Settings, AlertCircle, PlusSquare, Search
+    Briefcase, Phone, Settings, Search, PlusSquare, AlertCircle
 } from "lucide-react";
 import { getFullImageUrl } from "@/lib/config";
 import api from "@/lib/axios";
 import Link from "next/link";
+import { useAuth } from "@/providers/AuthProvider";
+import toast, { Toaster } from "react-hot-toast";
 
-// دالة لتجهيز بيانات الكارت (لتوحيد الشكل مع الرئيسية)
+// دالة تجهيز الكارت
 const prepareCardData = (item: any) => {
     const addressParts = [item.subdivision_name || item.subdivision?.name, item.major_zone_name || item.major_zone?.name, item.city_name || item.city?.name].filter(Boolean);
     let unifiedFeatures = [];
@@ -22,7 +24,7 @@ const prepareCardData = (item: any) => {
     if (item.area_sqm) unifiedFeatures.push({ label: "المساحة", value: `${item.area_sqm} م²`, icon: "ruler" });
     if (item.bedrooms) unifiedFeatures.push({ label: "غرف", value: `${item.bedrooms}`, icon: "bedroom" });
     if (item.bathrooms) unifiedFeatures.push({ label: "حمام", value: `${item.bathrooms}`, icon: "bath" });
-    if (item.floor_number) unifiedFeatures.push({ label: "الدور", value: `${item.floor_number}`, icon: "floor" });
+    if (item.floor_number !== null && item.floor_number !== undefined) unifiedFeatures.push({ label: "الدور", value: `${item.floor_number}`, icon: "floor" });
     
     if (item.dynamic_features && Array.isArray(item.dynamic_features)) {
         const extraFeats = item.dynamic_features.map((f: any) => ({
@@ -41,8 +43,9 @@ const prepareCardData = (item: any) => {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { isAuthenticated, logout } = useAuth();
+
   const [activeTab, setActiveTab] = useState("info");
-  
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   
@@ -54,35 +57,57 @@ export default function ProfilePage() {
   const [myListings, setMyListings] = useState<any[]>([]);
   const [savedListings, setSavedListings] = useState<any[]>([]);
 
+  // 🚀 منع الدخول لغير المسجلين
   useEffect(() => {
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!isAuthenticated && !loading) {
+          router.replace("/login");
+      }
+  }, [isAuthenticated, loading, router]);
 
-    if (!token) {
-        router.push("/login");
-        return;
-    }
+  // 🚀 الاستماع لزرار المفضلة
+  useEffect(() => {
+    const handleFavoriteToggle = (e: any) => {
+        const { listingId, isFavorite } = e.detail; 
+        if (!isFavorite) {
+            setSavedListings(prev => prev.filter(item => item.listing?.id !== Number(listingId)));
+        }
+    };
+
+    window.addEventListener('favoriteToggled', handleFavoriteToggle);
+    return () => window.removeEventListener('favoriteToggled', handleFavoriteToggle);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
 
     const fetchAllData = async () => {
         try {
             const [userRes, listingsRes, favsRes] = await Promise.all([
-                api.get('/auth/users/me/'),
-                api.get('/listings/my_listings/'),
-                api.get('/favorites/')
+                api.get('/auth/users/me/', { signal: controller.signal }),
+                api.get('/listings/my_listings/', { signal: controller.signal }),
+                api.get('/favorites/', { signal: controller.signal })
             ]);
             
-            setUserData(userRes.data);
-            setMyListings(Array.isArray(listingsRes.data) ? listingsRes.data : listingsRes.data.results || []);
-            setSavedListings(Array.isArray(favsRes.data) ? favsRes.data : favsRes.data.results || []);
+            setUserData(userRes.data || {});
+            setMyListings(Array.isArray(listingsRes.data) ? listingsRes.data : listingsRes.data?.results || []);
+            setSavedListings(Array.isArray(favsRes.data) ? favsRes.data : favsRes.data?.results || []);
             
-        } catch (error) {
-            console.error("Error fetching profile data", error);
+        } catch (error: any) {
+            if (error.name !== 'CanceledError' && error.response?.status !== 401) {
+                console.error("Error fetching profile data", error);
+                toast.error("حدث خطأ في تحميل البيانات");
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    fetchAllData();
-  }, [router]);
+    if (isAuthenticated) {
+        fetchAllData();
+    }
+
+    return () => controller.abort();
+  }, [isAuthenticated]);
 
   const handleUpdate = async () => {
       setUpdating(true);
@@ -99,22 +124,22 @@ export default function ProfilePage() {
               const storage = localStorage.getItem("token") ? localStorage : sessionStorage;
               storage.setItem("username", fullName);
           }
-          
-          alert("✅ تم تحديث بياناتك بنجاح!");
+          toast.success("تم تحديث بياناتك بنجاح!");
       } catch (error) {
-          alert("❌ حدث خطأ أثناء التحديث.");
+          toast.error("حدث خطأ أثناء التحديث.");
       } finally {
           setUpdating(false);
       }
   };
 
   const handleLogout = () => {
-      if(confirm("هل تريد بالفعل تسجيل الخروج؟")) {
-          localStorage.clear();
-          sessionStorage.clear();
+      if(window.confirm("هل تريد بالفعل تسجيل الخروج؟")) {
+          logout(); 
           router.push("/login");
       }
   };
+
+  if (!isAuthenticated && !loading) return null;
 
   if (loading) {
       return (
@@ -125,11 +150,13 @@ export default function ProfilePage() {
       );
   }
 
+  // 🚀 تنظيف قائمة المفضلة قبل الـ Render
+  const validSavedListings = savedListings.filter(f => f.listing);
+
   return (
     <main className="min-h-screen bg-[#F8FAFC] pb-32 font-sans dir-rtl">
-      <Navbar />
+      <Toaster position="top-center" reverseOrder={false} />
 
-      {/* 🌟 الهيدر الفخم */}
       <div className="bg-slate-900 pt-16 pb-24 px-4 text-center rounded-b-[2.5rem] relative shadow-lg">
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent rounded-b-[2.5rem]"></div>
           <div className="relative z-10 flex flex-col items-center">
@@ -145,9 +172,8 @@ export default function ProfilePage() {
           </div>
       </div>
 
-      {/* 🎛️ شريط التنقل السلس (Segmented Control) */}
       <div className="max-w-3xl mx-auto px-4 -mt-8 relative z-20">
-          <div className="bg-white p-1.5 rounded-2xl shadow-md border border-gray-100 flex items-center gap-1">
+          <div className="bg-white p-1.5 rounded-2xl shadow-md border border-gray-100 flex items-center gap-1 overflow-x-auto hide-scrollbar">
               {[
                   { id: "info", label: "بياناتي", icon: Settings },
                   { id: "listings", label: "إعلاناتي", icon: Building2 },
@@ -156,18 +182,17 @@ export default function ProfilePage() {
                   <button 
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all duration-300 ${activeTab === tab.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:bg-gray-50 hover:text-slate-900'}`}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 min-w-[100px] rounded-xl font-bold text-sm transition-all duration-300 ${activeTab === tab.id ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:bg-gray-50 hover:text-slate-900'}`}
                   >
-                      <tab.icon className="w-4 h-4" /> <span className="hidden sm:inline">{tab.label}</span>
+                      <tab.icon className="w-4 h-4 shrink-0" /> <span className="hidden sm:inline">{tab.label}</span>
                   </button>
               ))}
           </div>
       </div>
 
-      {/* 📑 محتوى الأقسام */}
       <div className="max-w-4xl mx-auto px-4 mt-8">
         
-        {/* ================= 1. قسم البيانات الشخصية ================= */}
+        {/* تبويب البيانات */}
         {activeTab === "info" && (
             <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4">
@@ -207,7 +232,7 @@ export default function ProfilePage() {
             </div>
         )}
 
-        {/* ================= 2. قسم إعلاناتي ================= */}
+        {/* تبويب إعلاناتي */}
         {activeTab === "listings" && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {myListings.length > 0 ? (
@@ -229,7 +254,6 @@ export default function ProfilePage() {
                                         features={features}
                                         phone_number={listing.owner_phone || ""}
                                     />
-                                    {/* زر تعديل الإعلان يظهر فوق الكارت */}
                                     <Link href={`/edit-property/${listing.id}`} className="absolute top-4 right-4 z-40 bg-white/90 backdrop-blur-md text-slate-900 px-4 py-2 rounded-xl text-xs font-black shadow-lg border border-white hover:bg-amber-500 hover:text-white transition-colors active:scale-95">
                                         تعديل الإعلان
                                     </Link>
@@ -250,19 +274,18 @@ export default function ProfilePage() {
             </div>
         )}
 
-        {/* ================= 3. قسم المفضلة ================= */}
+        {/* تبويب المفضلة */}
         {activeTab === "saved" && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {savedListings.length > 0 ? (
+                {validSavedListings.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {savedListings.map((favItem) => {
+                        {validSavedListings.map((favItem) => {
                             const realListing = favItem.listing;
-                            if(!realListing) return null;
                             const { address, features } = prepareCardData(realListing);
                             
                             return (
                                 <ListingCard 
-                                    key={favItem.id}
+                                    key={`fav-${favItem.id}-${realListing.id}`} // 🚀 حماية الكي
                                     id={realListing.id}
                                     title={realListing.title}
                                     price={realListing.price.toString()}

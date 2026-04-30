@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav"; // 🚀 تأكد من استدعاء الـ BottomNav
 import { getFullImageUrl } from '@/lib/config';
 import { 
     MapPin, Calendar, CreditCard, Building2, Phone, 
@@ -21,6 +22,18 @@ import 'swiper/css/navigation';
 import BeforeAfterSlider from '@/components/BeforeAfterSlider';
 import { trackEvent } from '@/lib/analytics';
 
+// 🚀 دالة تنظيف رقم الواتساب الذكية
+const formatWhatsappNumber = (phone: string | undefined | null) => {
+    if (!phone) return null;
+    let cleanPhone = phone.toString().replace(/\D/g, '');
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('01')) {
+        cleanPhone = `2${cleanPhone}`;
+    } else if (cleanPhone.length === 10 && cleanPhone.startsWith('1')) {
+        cleanPhone = `20${cleanPhone}`;
+    }
+    return `https://wa.me/${cleanPhone}`;
+};
+
 export default function PromotionClient({ promo }: { promo: any }) {
     const [selectedUnitImage, setSelectedUnitImage] = useState<string | null>(null);
     const isProject = promo.promo_type === 'PROJECT';
@@ -30,7 +43,16 @@ export default function PromotionClient({ promo }: { promo: any }) {
         trackEvent('VIEW', 'promotion', promo.id);
     }, [promo.id]);
 
-    // دالة استخراج اليوتيوب (للفيديو السفلي)
+    // 🚀 قفل السكرول لما تفتح صورة مكبرة
+    useEffect(() => {
+        if (selectedUnitImage) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => { document.body.style.overflow = 'unset'; };
+    }, [selectedUnitImage]);
+
     const getYouTubeEmbedUrl = (url: string) => {
         if (!url) return null;
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -38,12 +60,10 @@ export default function PromotionClient({ promo }: { promo: any }) {
         return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : null;
     };
 
-    // ✅ تمت إضافة دوال الاتصال التي كانت مفقودة وتسبب Crash
-    // ✅ تجهيز روابط الاتصال والواتساب
     const cleanPhone = promo.phone_number?.replace(/\D/g, '');
-    const cleanWhatsapp = promo.whatsapp_number?.replace(/\D/g, '');
     const phoneLink = cleanPhone ? `tel:${cleanPhone}` : null;
-    const whatsappLink = cleanWhatsapp ? `https://wa.me/2${cleanWhatsapp}` : null;
+    const whatsappLink = formatWhatsappNumber(promo.whatsapp_number); // 🚀 استخدام الدالة الذكية
+    
     const handleShare = async () => {
         if (navigator.share) {
             try {
@@ -61,16 +81,16 @@ export default function PromotionClient({ promo }: { promo: any }) {
 
     return (
         <main className="min-h-screen bg-[#F8FAFC] font-sans pb-32 dir-rtl">
-            <Navbar />
             
             {/* 🌟 1. الغلاف الرئيسي (Hero Banner) */}
             <div className="relative w-full h-[55vh] md:h-[70vh] bg-slate-900">
                 <Image 
-                    src={getFullImageUrl(promo.cover_image)} 
+                    src={getFullImageUrl(promo.cover_image) || "/images/placeholder-property.jpg"} 
                     alt={promo.title} 
                     fill 
                     className="object-cover" 
                     priority 
+                    sizes="(max-width: 768px) 100vw, 100vw" 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent"></div>
                 
@@ -89,7 +109,13 @@ export default function PromotionClient({ promo }: { promo: any }) {
                     </div>
                     {promo.developer_logo && (
                         <div className="w-20 h-20 md:w-32 md:h-32 bg-white rounded-2xl shadow-2xl relative overflow-hidden shrink-0 border border-gray-100 p-2">
-                            <Image src={getFullImageUrl(promo.developer_logo)} alt="Developer Logo" fill className="object-contain p-2"/>
+                            <Image 
+                                src={getFullImageUrl(promo.developer_logo)} 
+                                alt="Developer Logo" 
+                                fill 
+                                sizes="(max-width: 768px) 80px, 128px" 
+                                className="object-contain p-2"
+                            />
                         </div>
                     )}
                 </div>
@@ -158,7 +184,13 @@ export default function PromotionClient({ promo }: { promo: any }) {
                                     <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden group">
                                         <div className="h-40 relative cursor-pointer" onClick={() => unit.image && setSelectedUnitImage(unit.image)}>
                                             {unit.image ? (
-                                                <Image src={getFullImageUrl(unit.image)} alt={unit.title} fill className="object-cover group-hover:scale-105 transition duration-500" />
+                                                <Image 
+                                                    src={getFullImageUrl(unit.image)} 
+                                                    alt={unit.title} 
+                                                    fill 
+                                                    sizes="(max-width: 768px) 100vw, 33vw"
+                                                    className="object-cover group-hover:scale-105 transition duration-500" 
+                                                />
                                             ) : (
                                                 <div className="w-full h-full bg-slate-700 flex items-center justify-center"><ImageIcon className="w-8 h-8 text-slate-500" /></div>
                                             )}
@@ -186,7 +218,13 @@ export default function PromotionClient({ promo }: { promo: any }) {
                         <Swiper modules={[Pagination, Navigation, Autoplay]} spaceBetween={15} slidesPerView={1.2} breakpoints={{ 640: { slidesPerView: 2.2 }, 1024: { slidesPerView: 3.2 } }} className="w-full">
                             {promo.gallery.map((img: any) => (
                                 <SwiperSlide key={img.id} className="rounded-2xl overflow-hidden aspect-[4/3] relative group" onClick={() => setSelectedUnitImage(img.image)}>
-                                    <Image src={getFullImageUrl(img.image)} alt="Gallery" fill className="object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer" />
+                                    <Image 
+                                        src={getFullImageUrl(img.image)} 
+                                        alt="Gallery Image" 
+                                        fill 
+                                        sizes="(max-width: 768px) 100vw, 33vw" 
+                                        className="object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer" 
+                                    />
                                 </SwiperSlide>
                             ))}
                         </Swiper>
@@ -225,10 +263,9 @@ export default function PromotionClient({ promo }: { promo: any }) {
 
                 {/* 📍 7. الخريطة والعنوان النصي */}
                 {(promo.latitude && promo.longitude) || promo.address ? (
-                    <div className="bg-white rounded-[2rem] shadow-sm p-6 border border-gray-100">
+                    <div className="bg-white rounded-[2rem] shadow-sm p-6 border border-gray-100 mb-6">
                         <h3 className="font-black text-xl text-slate-900 mb-6 flex items-center gap-2"><MapPin className="w-6 h-6 text-blue-500"/> موقع الإعلان</h3>
                         
-                        {/* العنوان النصي */}
                         {promo.address && (
                             <div className="mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-start gap-3">
                                 <MapPin className="w-6 h-6 text-slate-400 shrink-0" />
@@ -239,18 +276,18 @@ export default function PromotionClient({ promo }: { promo: any }) {
                             </div>
                         )}
 
-                        {/* الخريطة التفاعلية */}
                         {promo.latitude && promo.longitude && (
                             <div className="h-64 md:h-80 w-full rounded-2xl overflow-hidden shadow-inner border border-gray-200 relative group">
+                                {/* 🚀 رابط الخريطة الصحيح الخالي من الـ Bugs */}
                                 <iframe 
                                     title="Map" 
                                     width="100%" height="100%" frameBorder="0" scrolling="no" 
                                     src={`https://maps.google.com/maps?q=${promo.latitude},${promo.longitude}&hl=ar&z=15&output=embed`} 
                                     className="grayscale group-hover:grayscale-0 transition duration-700"
                                 ></iframe>
-                                {/* زرار فتح في جوجل ماب */}
+                                
                                 <a 
-                                    href={`https://www.google.com/maps/search/?api=1&query=${promo.latitude},${promo.longitude}`} 
+                                    href={`https://www.google.com/maps?q=${promo.latitude},${promo.longitude}`} 
                                     target="_blank" 
                                     rel="noreferrer"
                                     className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md text-slate-900 px-4 py-2 rounded-xl text-sm font-black shadow-lg hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-2"
@@ -266,15 +303,24 @@ export default function PromotionClient({ promo }: { promo: any }) {
             {/* 🔍 Lightbox للصور المكبرة */}
             {selectedUnitImage && (
                 <div className="fixed inset-0 z-[100000] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in duration-300">
-                    <button className="absolute top-6 right-6 bg-white/10 p-3 rounded-full text-white hover:bg-white/20 transition" onClick={() => setSelectedUnitImage(null)}><X className="w-8 h-8" /></button>
+                    <button className="absolute top-6 right-6 bg-white/10 p-3 rounded-full text-white hover:bg-white/20 transition" onClick={() => setSelectedUnitImage(null)}>
+                        <X className="w-8 h-8" />
+                    </button>
                     <div className="relative w-full h-full max-w-5xl max-h-[85vh]">
-                        <Image src={getFullImageUrl(selectedUnitImage)} alt="Preview" fill className="object-contain" />
+                        <Image 
+                            src={getFullImageUrl(selectedUnitImage)} 
+                            alt="Preview" 
+                            fill 
+                            sizes="100vw"
+                            className="object-contain" 
+                        />
                     </div>
                 </div>
             )}
 
             {/* 📞 شريط التواصل العائم */}
-            <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[600px] bg-slate-900/85 backdrop-blur-xl border border-white/20 p-3 rounded-[2rem] shadow-2xl z-50 transition-all duration-500 animate-in slide-in-from-bottom-10">
+            {/* 🚀 تعديل الـ z-index ومكان الظهور في الموبايل لتفادي تداخل الـ BottomNav */}
+            <div className="fixed bottom-24 md:bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[600px] bg-slate-900/85 backdrop-blur-xl border border-white/20 p-3 rounded-[2rem] shadow-2xl z-50 transition-all duration-500 animate-in slide-in-from-bottom-10">
                 <div className="flex gap-3">
                     {phoneLink && (
                         <a href={phoneLink} onClick={() => trackEvent('CALL', 'promotion', promo.id)} className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base bg-white text-slate-900 hover:bg-gray-100 active:scale-95 transition-all">
@@ -282,12 +328,15 @@ export default function PromotionClient({ promo }: { promo: any }) {
                         </a>
                     )}
                     {whatsappLink && (
-                        <a href={whatsappLink} target="_blank" onClick={() => trackEvent('WHATSAPP', 'promotion', promo.id)} className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base bg-[#25D366] text-white hover:brightness-105 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.4)]">
+                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('WHATSAPP', 'promotion', promo.id)} className="flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base bg-[#25D366] text-white hover:brightness-105 active:scale-95 transition-all shadow-[0_0_15px_rgba(37,211,102,0.4)]">
                             <MessageCircle className="w-5 h-5" /> واتساب
                         </a>
                     )}
                 </div>
             </div>
+
+            {/* 🚀 استدعاء הـ BottomNav عشان التصميم يكمل */}
+            <BottomNav />
         </main>
     );
 }
