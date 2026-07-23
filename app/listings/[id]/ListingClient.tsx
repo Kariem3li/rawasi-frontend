@@ -14,7 +14,9 @@ import {
 import { getFullImageUrl } from "@/lib/config";
 import { trackEvent } from '@/lib/analytics';
 import FavoriteButton from '@/components/FavoriteButton';
-
+import { useRouter } from 'next/navigation';
+import api from '@/lib/axios';
+import { useAuth } from "@/providers/AuthProvider";
 import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
@@ -25,6 +27,7 @@ const getYouTubeEmbedUrl = (url: string) => {
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? `https://www.youtube.com/embed/${match[2]}` : null;
 };
+
 
 // ... (IconsRegistry and getIcon functions remain the same)
 const IconsRegistry: Record<string, any> = {
@@ -78,6 +81,36 @@ const formatWhatsappNumber = (phone: string | undefined | null) => {
 
 
 export default function ListingClient({ listing }: { listing: any }) {
+    const router = useRouter();
+    const { isAuthenticated } = useAuth();
+    const [isStartingChat, setIsStartingChat] = useState(false);
+
+    const handleStartChat = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (listing.status === 'Sold') return;
+
+        if (!isAuthenticated) {
+            alert("يرجى تسجيل الدخول أولاً لبدء المحادثة");
+            router.push('/login');
+            return;
+        }
+
+        setIsStartingChat(true);
+        try {
+            // بنبعت طلب للباك إند يفتح الغرفة أو يكريتها
+            const response = await api.post(`/api/chat/rooms/start/${listing.id}/`);
+            // بنوجه اليوزر لصفحة الغرفة دي
+            router.push(`/chat/${response.data.id}`);
+        } catch (error: any) {
+            if (error.response?.data?.detail) {
+                alert(error.response.data.detail); // مثلاً: لا يمكنك التحدث مع نفسك
+            } else {
+                alert("حدث خطأ أثناء فتح المحادثة");
+            }
+        } finally {
+            setIsStartingChat(false);
+        }
+    };
   const [showLightbox, setShowLightbox] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showMapLightbox, setShowMapLightbox] = useState(false); 
@@ -219,7 +252,26 @@ export default function ListingClient({ listing }: { listing: any }) {
                     </div>
                 </div>
             </div>
-
+            {/* 🚀 صندوق التواصل المباشر مع المالك */}
+            <div className="bg-amber-50 border border-amber-200 p-5 rounded-2xl mb-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-right w-full sm:w-auto">
+                    <h3 className="font-black text-amber-900 mb-1 flex items-center gap-2">
+                        <MessageCircle className="w-5 h-5" /> التفاوض المباشر
+                    </h3>
+                    <p className="text-sm text-amber-800/80 font-medium">تواصل مع مالك العقار مباشرة عبر الشات الداخلي الآمن للموقع.</p>
+                </div>
+                <button 
+                    onClick={handleStartChat} 
+                    disabled={isStartingChat || listing.status === 'Sold'}
+                    className="w-full sm:w-auto shrink-0 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black px-6 py-3.5 rounded-xl shadow-[0_5px_15px_rgba(245,158,11,0.3)] transition-all active:scale-95 flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
+                >
+                    {isStartingChat ? (
+                        <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        "تواصل مع المالك مباشرة"
+                    )}
+                </button>
+            </div>
             {/* الوصف */}
             <div className="mb-10">
                 <h3 className="font-black text-lg text-slate-900 mb-4 flex items-center gap-2">
@@ -346,18 +398,31 @@ export default function ListingClient({ listing }: { listing: any }) {
       </div>
 
       {/* 📞 شريط التواصل العائم (Floating Bottom Bar) */}
-      <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[600px] bg-slate-900/85 backdrop-blur-xl border border-white/20 p-3 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 animate-in slide-in-from-bottom-10">
-         <div className="flex gap-3">
-             <a href={phoneLink || '#'} onClick={(e) => { if(!phoneLink || listing.status === 'Sold') e.preventDefault(); else trackEvent('CALL', 'listing', listing.id); }} 
-                className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base transition-all active:scale-95 ${phoneLink && listing.status !== 'Sold' ? 'bg-white text-slate-900 hover:bg-gray-100' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
-                 <Phone className="w-5 h-5" /> اتصال
-             </a>
-             <a href={whatsappLink || '#'} target="_blank" rel="noopener noreferrer" onClick={(e) => { if(!whatsappLink || listing.status === 'Sold') e.preventDefault(); else trackEvent('WHATSAPP', 'listing', listing.id); }} 
-                className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-2 font-black text-sm md:text-base transition-all active:scale-95 ${whatsappLink && listing.status !== 'Sold' ? 'bg-[#25D366] text-white hover:brightness-105 shadow-[0_0_15px_rgba(37,211,102,0.4)]' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
-                 <MessageCircle className="w-5 h-5" /> واتساب
-             </a>
-         </div>
-      </div>
+        <div className="fixed bottom-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-[650px] bg-slate-900/85 backdrop-blur-xl border border-white/20 p-3 rounded-[2rem] shadow-[0_20px_40px_rgba(0,0,0,0.3)] z-50 transition-all duration-500 animate-in slide-in-from-bottom-10">
+            <div className="flex gap-2">
+                {/* زرار الاتصال */}
+                <a href={phoneLink || '#'} onClick={(e) => { if(!phoneLink || listing.status === 'Sold') e.preventDefault(); else trackEvent('CALL', 'listing', listing.id); }} 
+                className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-1.5 md:gap-2 font-black text-xs md:text-sm transition-all active:scale-95 ${phoneLink && listing.status !== 'Sold' ? 'bg-white text-slate-900 hover:bg-gray-100' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
+                    <Phone className="w-4 h-4 md:w-5 md:h-5" /> <span className="hidden sm:inline">اتصال</span>
+                </a>
+                
+                {/* زرار الواتساب (اللي بيكلمك إنتي كـ وسيط) */}
+                <a href={whatsappLink || '#'} target="_blank" rel="noopener noreferrer" onClick={(e) => { if(!whatsappLink || listing.status === 'Sold') e.preventDefault(); else trackEvent('WHATSAPP', 'listing', listing.id); }} 
+                className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-1.5 md:gap-2 font-black text-xs md:text-sm transition-all active:scale-95 ${whatsappLink && listing.status !== 'Sold' ? 'bg-[#25D366] text-white hover:brightness-105 shadow-[0_0_15px_rgba(37,211,102,0.4)]' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
+                    <MessageCircle className="w-4 h-4 md:w-5 md:h-5" /> <span className="hidden sm:inline">واتساب</span>
+                </a>
+
+                {/* 🚀 زرار الشات الداخلي في الشريط العائم */}
+                <button onClick={handleStartChat} disabled={isStartingChat || listing.status === 'Sold'}
+                className={`flex-1 h-14 rounded-2xl flex items-center justify-center gap-1.5 md:gap-2 font-black text-xs md:text-sm transition-all active:scale-95 ${listing.status !== 'Sold' ? 'bg-amber-500 text-slate-900 hover:bg-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
+                    {isStartingChat ? (
+                        <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <><MessageCircle className="w-4 h-4 md:w-5 md:h-5" /> <span className="hidden sm:inline">شات المالك</span></>
+                    )}
+                </button>
+            </div>
+        </div>
 
       {/* 🔍 نافذة عرض الصور بكامل الشاشة (Lightbox) */}
       {showLightbox && (

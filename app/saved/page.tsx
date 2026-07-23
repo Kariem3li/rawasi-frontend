@@ -20,7 +20,7 @@ export default function SavedListings() {
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🚀 حماية הـ Route
+  // 🚀 حماية  Route
   useEffect(() => {
       if (!isAuthenticated && !loading) {
           router.replace("/login");
@@ -94,7 +94,7 @@ export default function SavedListings() {
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] pb-32 font-sans dir-rtl">
-      {/* الهيدر הפخم */}
+      {/* الهيدر  */}
       <div className="bg-slate-900 text-white pt-24 pb-20 px-4 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[80px] pointer-events-none"></div>
         
