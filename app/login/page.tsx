@@ -69,7 +69,8 @@ export default function Login() {
             const isStaff = !!res.data.is_staff;
 
             // 🚀 تشغيل الدالة الاحترافية (هتحدث الـ Navbar فوراً)
-            login(token, fullName, isStaff, isRemember);
+            // بتضيفي المتغير بتاع الـ id في المركز التاني
+            login(token, response.data.user.id, fullName, isStaff, isRemember);
             api.defaults.headers.common['Authorization'] = `Token ${token}`;
             // 🚀 تخزين آمن باستخدام Cookies بدل LocalStorage للتوكن
             Cookies.set("token", token, { 
