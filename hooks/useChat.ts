@@ -17,11 +17,11 @@ export const useChat = (roomId: string) => {
       try {
         setLoading(true);
         // ✅ التعديل هنا: إضافة /api/ في الأول
-        const response = await api.get(`/api/chat/rooms/${roomId}/messages/`);
+        const response = await api.get(`/chat/rooms/${roomId}/messages/`);
         setMessages(response.data);
         
         // ✅ التعديل هنا: إضافة /api/ في الأول
-        await api.post(`/api/chat/rooms/${roomId}/read/`); 
+        await api.post(`/chat/rooms/${roomId}/read/`); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
       } finally {
@@ -60,7 +60,7 @@ export const useChat = (roomId: string) => {
   const sendMessage = async (content: string) => {
     try {
       // ✅ التعديل هنا: إضافة /api/ في الأول
-      await api.post(`/api/chat/rooms/${roomId}/messages/`, { content });
+      await api.post(`/chat/rooms/${roomId}/messages/`, { content });
     } catch (error: any) {
       if (error.response?.data?.content) {
         alert(error.response.data.content[0]);

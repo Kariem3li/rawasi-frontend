@@ -13,7 +13,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     const fetchRooms = async () => {
       try {
         // ✅ التعديل هنا: إضافة /api في الأول عشان مسار الباك إند يكون سليم
-        const response = await api.get('/api/chat/rooms/');
+        const response = await api.get('/chat/rooms/');
         setRooms(response.data);
       } catch (error) {
         console.error("خطأ في جلب الغرف:", error);
