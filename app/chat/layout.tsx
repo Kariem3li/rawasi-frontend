@@ -14,6 +14,8 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     const fetchRooms = async () => {
       try {
         const response = await api.get('chat/rooms/');
+        console.log("الرد الكامل من السيرفر:", response);
+        console.log("الداتا اللي راجعة:", response.data);
         // 🚀 السحر هنا: لو الداتا جاية في Object بسبب الـ Pagination بناخد الـ results
         const fetchedRooms = Array.isArray(response.data) 
           ? response.data 
