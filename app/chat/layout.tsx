@@ -13,7 +13,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     const fetchRooms = async () => {
       try {
         // المسار هنا صحيح 100% بناءً على إعدادات axios الخاصة بك
-        const response = await api.get('/chat/rooms/');
+        const response = await api.get('chat/rooms/');
         setRooms(response.data);
       } catch (error) {
         console.error(error);
