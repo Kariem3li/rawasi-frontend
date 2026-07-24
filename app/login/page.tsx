@@ -9,18 +9,18 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
-import { useContactInfo } from "@/lib/useContactInfo"; // السحر بتاعنا
-import Cookies from "js-cookie"; // للأمان
-import toast, { Toaster } from "react-hot-toast"; // للإشعارات
+import { useContactInfo } from "@/lib/useContactInfo"; 
+import Cookies from "js-cookie"; 
+import toast, { Toaster } from "react-hot-toast"; 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useAuth } from "@/providers/AuthProvider"; // 👈 الاستدعاء
-// 🚀 Zod Schema للـ Validation (بعد التعديل)
+import { useAuth } from "@/providers/AuthProvider"; 
+
 const loginSchema = z.object({
     phone: z.string().regex(/^01[0125][0-9]{8}$/, "رقم الهاتف غير صالح، يجب أن يكون رقم مصري صحيح"),
     password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
-    rememberMe: z.boolean().optional(), // التعديل هنا: خليناها optional بدل default
+    rememberMe: z.boolean().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -31,7 +31,6 @@ export default function Login() {
     const { contactInfo } = useContactInfo();
     const [showPassword, setShowPassword] = useState(false);
 
-    // 🚀 ربط React Hook Form بـ Zod
     const { 
         register, 
         handleSubmit, 
@@ -45,7 +44,6 @@ export default function Login() {
 
     const rememberMeChecked = watch("rememberMe");
 
-    // استرجاع الرقم لو كان محفوظ
     useEffect(() => {
         const savedPhone = localStorage.getItem("remembered_phone");
         if (savedPhone) {
@@ -63,25 +61,27 @@ export default function Login() {
 
             const token = res.data.token;
             const fullName = res.data.name || data.phone;
-            
-            // 🚀 تحويل القيمة لـ boolean صريح لتجنب مشاكل الـ undefined
             const isRemember = !!data.rememberMe; 
             const isStaff = !!res.data.is_staff;
 
-            // 🚀 تشغيل الدالة الاحترافية (هتحدث الـ Navbar فوراً)
-            // بتضيفي المتغير بتاع الـ id في المركز التاني
-            login(token, response.data.user.id, fullName, isStaff, isRemember);
+            // 🚀 تصحيح: استخدام res.data.user.id أو res.data.id حسب الـ API بتاعك
+            // في الغالب الـ id بيكون جوه res.data.user أو res.data مباشرة
+            // هنستخدم الاختصار ده عشان لو موجود في أي واحد فيهم يلقطه
+            const userId = res.data.user?.id || res.data.id || "0"; 
+
+            // 🚀 الدالة الاحترافية كاملة بـ 5 متغيرات
+            login(token, userId, fullName, isStaff, isRemember);
+            
             api.defaults.headers.common['Authorization'] = `Token ${token}`;
-            // 🚀 تخزين آمن باستخدام Cookies بدل LocalStorage للتوكن
+            
             Cookies.set("token", token, { 
-                expires: isRemember ? 30 : undefined, // هنا استخدمنا المتغير الجديد
+                expires: isRemember ? 30 : undefined, 
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "strict"
             });
 
-            // البيانات العادية ممكن تتحفظ في LocalStorage
             localStorage.setItem("username", fullName);
-            if (res.data.is_staff) localStorage.setItem('is_staff', "true");
+            if (isStaff) localStorage.setItem('is_staff', "true");
 
             if (isRemember) localStorage.setItem('remembered_phone', data.phone);
             else localStorage.removeItem('remembered_phone');
