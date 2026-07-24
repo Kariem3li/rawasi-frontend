@@ -3,12 +3,12 @@ import { useState, useEffect } from 'react';
 import Pusher from 'pusher-js';
 import api from '@/lib/axios';
 import { API_URL } from '@/lib/config';
-import { useAuth } from '@/providers/AuthProvider'; // 🚀 1. استدعاء بيانات المستخدم
+import { useAuth } from '@/providers/AuthProvider';
 
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth(); // 🚀 2. جلب بيانات المستخدم الحالي
+  const { user } = useAuth(); 
 
   useEffect(() => {
     if (!roomId) return;
@@ -16,13 +16,19 @@ export const useChat = (roomId: string) => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`chat/rooms/${roomId}/messages/`);
+        
+        // 🚀 كسر الـ Cache الإجباري للمتصفح وجلب أحدث رسائل
+        const response = await api.get(`chat/rooms/${roomId}/messages/`, {
+            params: { _t: new Date().getTime() } 
+        });
         
         const fetchedMessages = Array.isArray(response.data) 
             ? response.data 
             : (response.data?.results || []);
             
         setMessages(fetchedMessages);
+        
+        // إشعار قراءة للرسائل
         await api.post(`chat/rooms/${roomId}/read/`).catch(() => {}); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
@@ -39,39 +45,36 @@ export const useChat = (roomId: string) => {
         token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
     }
 
-    if (!token) {
-        console.warn("No token found, skipping Pusher connection.");
-        return;
-    }
+    if (!token) return;
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
       authEndpoint: `${API_URL}chat/pusher/auth/`,
-      auth: {
-        headers: { 
-          Authorization: `Token ${token}`
-        },
-      },
+      auth: { headers: { Authorization: `Token ${token}` } },
     });
 
     const channel = pusher.subscribe(`private-chat_${roomId}`);
 
     channel.bind('new_message', (newMsg: any) => {
-      // 🚀 3. السحر الحقيقي هنا: إعادة حساب is_me بناءً على اليوزر اللي فاتح الشاشة دلوقتي
-      const actualIsMe = String(newMsg.sender) === String(user?.id);
-      
-      // بنعمل نسخة جديدة من الرسالة بالمعلومة الصحيحة
-      const correctedMsg = { ...newMsg, is_me: actualIsMe };
-
       setMessages((prev) => {
-          if (Array.isArray(prev) && prev.find(m => m.id === correctedMsg.id)) return prev;
-          return Array.isArray(prev) ? [...prev, correctedMsg] : [correctedMsg];
+          let actualIsMe = String(newMsg.sender) === String(user?.id);
+          
+          if (!actualIsMe && Array.isArray(prev)) {
+              const pastMsg = prev.find(m => m.is_me === true);
+              if (pastMsg && String(newMsg.sender) === String(pastMsg.sender)) {
+                  actualIsMe = true;
+              }
+          }
+
+          const correctedMsg = { ...newMsg, is_me: actualIsMe };
+          const filtered = Array.isArray(prev) ? prev.filter(m => m.id !== correctedMsg.id) : [];
+          
+          if (!actualIsMe) {
+             api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
+          }
+          
+          return [...filtered, correctedMsg];
       });
-      
-      // 🚀 4. دلوقتي الشرط هيشتغل صح 100%.. لو مش رسالتي هبعت إشعار السين للطرف التاني فوراً
-      if (!actualIsMe) {
-          api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
-      }
     });
 
     channel.bind('messages_read', () => {
@@ -87,15 +90,17 @@ export const useChat = (roomId: string) => {
             console.error("Pusher cleanup error:", e);
         }
     };
-  }, [roomId, user?.id]); // 🚀 5. إضافة user?.id للمصفوفة عشان الكود يتحدث صح
+  }, [roomId, user?.id]);
 
   const sendMessage = async (content: string) => {
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
       
+      const myMsg = { ...res.data, is_me: true };
+      
       setMessages((prev) => {
-          if (Array.isArray(prev) && prev.find(m => m.id === res.data.id)) return prev;
-          return Array.isArray(prev) ? [...prev, res.data] : [res.data];
+          const filtered = Array.isArray(prev) ? prev.filter(m => m.id !== myMsg.id) : [];
+          return [...filtered, myMsg];
       });
       
     } catch (error: any) {
