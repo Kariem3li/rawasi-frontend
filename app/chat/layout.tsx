@@ -22,10 +22,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="flex h-[calc(100dvh-80px)] bg-white border-t border-gray-200" dir="rtl">
+    <div className="flex h-[calc(100vh-80px)] bg-white border-t border-gray-200" dir="rtl">
       {/* القائمة الجانبية للمحادثات */}
-      <div className={`${isRootChat ? 'block' : 'hidden'} md:block w-full md:w-1/3 lg:w-1/4 h-full border-l border-gray-200 bg-white overflow-y-auto`}>
-        <div className="p-4 bg-gray-50 border-b border-gray-200 sticky top-0 font-bold text-lg text-gray-800 z-10">
+      <div className={`${isRootChat ? 'block' : 'hidden'} md:block w-full md:w-1/3 lg:w-1/4 border-l border-gray-200 bg-white overflow-y-auto`}>
+        <div className="p-4 bg-gray-50 border-b border-gray-200 sticky top-0 font-bold text-lg text-gray-800">
           المحادثات
         </div>
         {rooms.map(room => (
@@ -45,8 +45,8 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         {rooms.length === 0 && <div className="p-4 text-center text-gray-500">لا توجد محادثات حتى الآن</div>}
       </div>
 
-      {/* منطقة عرض المحادثة النشطة - أضفنا h-full و relative */}
-      <div className={`${!isRootChat ? 'block' : 'hidden'} md:block w-full md:w-2/3 lg:w-3/4 h-full relative overflow-hidden bg-[#efeae2]`}>
+      {/* منطقة عرض المحادثة النشطة - تم التعديل هنا */}
+      <div className={`${!isRootChat ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-2/3 lg:w-3/4 h-full bg-[#efeae2] relative overflow-hidden`}>
         {children}
       </div>
     </div>
