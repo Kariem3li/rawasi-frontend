@@ -3,40 +3,59 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/axios';
 import { usePathname } from 'next/navigation';
-import { MessageCircle } from 'lucide-react'; // أيقونة إضافية للزينة
+import { MessageCircle, RefreshCw } from 'lucide-react'; 
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const [rooms, setRooms] = useState<any[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
   const pathname = usePathname();
   const isRootChat = pathname === '/chat' || pathname === '/chat/';
 
+  // 🚀 فصلنا الدالة عشان نقدر ننده عليها من زرار التحديث
+  const fetchRooms = async () => {
+    console.log("🔄 جاري طلب الغرف من الباك إند..."); // ده هيظهر في F12 بتاع المتصفح
+    setIsFetching(true);
+    try {
+      const response = await api.get('chat/rooms/');
+      console.log("✅ الرد وصل بنجاح:", response.data);
+      
+      const fetchedRooms = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || []);
+        
+      setRooms(fetchedRooms);
+    } catch (error) {
+      console.error("❌ خطأ في جلب الغرف:", error);
+      setRooms([]);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const response = await api.get('chat/rooms/');
-        console.log("الرد الكامل من السيرفر:", response);
-        console.log("الداتا اللي راجعة:", response.data);
-        // 🚀 السحر هنا: لو الداتا جاية في Object بسبب الـ Pagination بناخد الـ results
-        const fetchedRooms = Array.isArray(response.data) 
-          ? response.data 
-          : (response.data?.results || []);
-          
-        setRooms(fetchedRooms);
-      } catch (error) {
-        console.error("خطأ في جلب الغرف:", error);
-        setRooms([]);
-      }
-    };
     fetchRooms();
-  }, [pathname]); // 🚀 ضفنا pathname عشان لو اتنقل بين الغرف اللستة تتحدث
+  }, [pathname]);
 
   return (
     <div className="flex h-[calc(100vh-75px)] mt-[75px] bg-white overflow-hidden" dir="rtl">
+      
       {/* القائمة الجانبية للمحادثات */}
       <div className={`${isRootChat ? 'block' : 'hidden'} md:block w-full md:w-[350px] shrink-0 border-l border-gray-200 bg-white flex flex-col`}>
-        <div className="p-4 md:p-5 bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-amber-500" />
-          <h2 className="font-black text-lg text-slate-800">الرسائل</h2>
+        <div className="p-4 md:p-5 bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-amber-500" />
+            <h2 className="font-black text-lg text-slate-800">الرسائل</h2>
+          </div>
+          
+          {/* 🚀 زرار التحديث اليدوي (هيكسر أي كاش وهينقذنا) */}
+          <button 
+            onClick={fetchRooms} 
+            disabled={isFetching}
+            className="p-2 rounded-full bg-gray-50 text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+            title="تحديث المحادثات"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
         </div>
         
         <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -65,7 +84,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                             {room.last_message?.content || "لا توجد رسائل"}
                         </p>
                         
-                        {/* 🚀 إظهار النقطة الحمرا لو الغرفة فيها رسايل جديدة */}
                         {room.unread_count > 0 && (
                             <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shrink-0">
                                 {room.unread_count}
