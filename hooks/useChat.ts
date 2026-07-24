@@ -33,7 +33,7 @@ export const useChat = (roomId: string) => {
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      authEndpoint: `${API_URL}/chat/pusher/auth/`,
+      authEndpoint: `${API_URL}chat/pusher/auth/`,
       auth: {
         headers: { 
           Authorization: `Token ${token}`,
