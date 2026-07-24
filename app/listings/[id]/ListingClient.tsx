@@ -98,7 +98,7 @@ export default function ListingClient({ listing }: { listing: any }) {
         setIsStartingChat(true);
         try {
             // بنبعت طلب للباك إند يفتح الغرفة أو يكريتها
-            const response = await api.post(`/api/chat/rooms/start/${listing.id}/`);
+            const response = await api.post(`/chat/rooms/start/${listing.id}/`);
             // بنوجه اليوزر لصفحة الغرفة دي
             router.push(`/chat/${response.data.id}`);
         } catch (error: any) {

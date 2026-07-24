@@ -12,9 +12,9 @@ export const useChat = (roomId: string) => {
 
     const fetchMessages = async () => {
       try {
-        const response = await api.get(`/api/chat/rooms/${roomId}/messages/`);
+        const response = await api.get(`/chat/rooms/${roomId}/messages/`);
         setMessages(response.data);
-        await api.post(`/api/chat/rooms/${roomId}/read/`); 
+        await api.post(`/chat/rooms/${roomId}/read/`); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
       } finally {
@@ -27,7 +27,7 @@ export const useChat = (roomId: string) => {
     // إعداد Pusher
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/pusher/auth/`,
+      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/chat/pusher/auth/`,
       auth: {
         headers: { Authorization: `Token ${localStorage.getItem('token')}` },
       },
@@ -52,7 +52,7 @@ export const useChat = (roomId: string) => {
 
   const sendMessage = async (content: string) => {
     try {
-      await api.post(`/api/chat/rooms/${roomId}/messages/`, { content });
+      await api.post(`/chat/rooms/${roomId}/messages/`, { content });
     } catch (error: any) {
       if (error.response?.data?.content) {
         alert(error.response.data.content[0]);
