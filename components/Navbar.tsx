@@ -20,8 +20,10 @@ export default function Navbar() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   
+  // 🚀 حالة لعداد رسائل الشات غير المقروءة
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
+  // قفل السكرول لما المنيو تفتح
   useEffect(() => {
     if (isSidebarOpen || showAuthModal) {
       document.body.style.overflow = 'hidden';
@@ -31,11 +33,13 @@ export default function Navbar() {
     return () => { document.body.style.overflow = 'auto'; };
   }, [isSidebarOpen, showAuthModal]);
 
+  // إغلاق المنيو عند تغيير الصفحة
   useEffect(() => {
     setIsSidebarOpen(false);
     setShowAuthModal(false);
   }, [pathname]);
 
+  // 🚀 جلب عدد الرسايل غير المقروءة وربط البوشر العام
   useEffect(() => {
     if (!isAuthenticated) {
         setUnreadChatCount(0);
@@ -47,15 +51,15 @@ export default function Navbar() {
 
     const setupChatNotifications = async () => {
         try {
+            // 1. جلب العدد الأولي من الباك إند
+            // (بافتراض إنك هتعملي endpoint بيرجع { unread_count: 5 })
+            // لو معندكيش الـ endpoint ده حالياً، الكود مش هيضرب هيكمل عادي
             const res = await api.get('chat/unread-count/').catch(() => ({ data: { unread_count: 0 } }));
             setUnreadChatCount(res.data.unread_count || 0);
 
+            // 2. ربط البوشر العام لليوزر عشان يسمع أي رسالة في أي غرفة
             const token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
-            
-            // 🚀 تجاوز آمن لـ TypeScript عشان يقبل الـ id
-            const userId = (user as any)?.id;
-            
-            if (!token || !userId) return;
+            if (!token || !user?.id) return;
 
             pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
                 cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
@@ -63,9 +67,12 @@ export default function Navbar() {
                 auth: { headers: { Authorization: `Token ${token}` } },
             });
 
-            globalChannel = pusherInstance.subscribe(`private-user_${userId}`);
+            // اليوزر بيشترك في قناة خاصة بيه هو بس
+            globalChannel = pusherInstance.subscribe(`private-user_${user.id}`);
             
+            // لما تيجي رسالة جديدة، بنزود العداد
             globalChannel.bind('new_message_notification', () => {
+                // لو اليوزر مش فاتح صفحة الشات دلوقتي، زوّد العداد
                 if (!pathname.startsWith('/chat')) {
                     setUnreadChatCount((prev) => prev + 1);
                 }
@@ -87,7 +94,7 @@ export default function Navbar() {
             pusherInstance.disconnect();
         }
     };
-  }, [isAuthenticated, (user as any)?.id, pathname]);
+  }, [isAuthenticated, user?.id, pathname]);
 
   const handleLogout = () => {
       if(window.confirm("هل تريد بالفعل تسجيل الخروج؟")) {
@@ -148,6 +155,7 @@ export default function Navbar() {
               <div className="animate-in fade-in duration-500 flex items-center gap-3">
                 {isAuthenticated ? (
                   <>
+                      {/* 🚀 أيقونة الشات الجديدة */}
                       <button onClick={(e) => handleProtectedClick(e, '/chat')} className="relative p-2 rounded-full text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors active:scale-95" aria-label="الرسائل">
                           <MessageCircle className="w-6 h-6" />
                           {unreadChatCount > 0 && (
@@ -187,6 +195,7 @@ export default function Navbar() {
         aria-hidden="true"
       ></div>
 
+      {/* القائمة الجانبية (Sidebar) */}
       <div className={`md:hidden fixed top-0 right-0 h-[100dvh] w-[85%] max-w-[320px] bg-white z-[9991] shadow-2xl transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
           <div className="flex flex-col h-full p-6 relative">
               <div className="flex justify-between items-center mb-8">
@@ -224,6 +233,7 @@ export default function Navbar() {
                   <button onClick={(e) => handleProtectedClick(e, '/my-listings')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300"><Building2 className="w-5 h-5"/> إعلاناتي</button>
                   <button onClick={(e) => handleProtectedClick(e, '/saved')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300"><Heart className="w-5 h-5"/> المفضلة</button>
                   
+                  {/* 🚀 أيقونة الشات في الموبايل */}
                   <button onClick={(e) => handleProtectedClick(e, '/chat')} className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-amber-50 text-amber-700 font-bold hover:bg-amber-500 hover:text-slate-900 transition-all duration-300">
                       <div className="flex items-center gap-4"><MessageCircle className="w-5 h-5"/> الرسائل</div>
                       {unreadChatCount > 0 && <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">{unreadChatCount}</span>}
