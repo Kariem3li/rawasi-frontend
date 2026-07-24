@@ -2,25 +2,24 @@
 import { useState, useEffect } from 'react';
 import Pusher from 'pusher-js';
 import api from '@/lib/axios';
-import { API_URL } from '@/lib/config'; // 🚀 استدعينا الرابط المتين من الكونفيج
+import { API_URL } from '@/lib/config';
+
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!roomId) {
-      setLoading(false);
-      return;
-    }
+    if (!roomId) return;
 
     const fetchMessages = async () => {
       try {
         setLoading(true);
         const response = await api.get(`chat/rooms/${roomId}/messages/`);
-        setMessages(response.data);
+        setMessages(Array.isArray(response.data) ? response.data : []);
         await api.post(`chat/rooms/${roomId}/read/`); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
+        setMessages([]);
       } finally {
         setLoading(false);
       }
@@ -28,16 +27,25 @@ export const useChat = (roomId: string) => {
 
     fetchMessages();
 
-    // جلب التوكن بطريقة آمنة
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || sessionStorage.getItem('token') : '';
+    // 🚀 تنظيف استخراج التوكن
+    let token = '';
+    if (typeof window !== 'undefined') {
+        token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+    }
+
+    // 🚀 لو مفيش توكن، متعملش اتصال بالبوشر عشان ميضربش 401
+    if (!token) {
+        console.warn("No token found, skipping Pusher connection.");
+        return;
+    }
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
       authEndpoint: `${API_URL}chat/pusher/auth/`,
       auth: {
+        // 🚀 هيدر واحد بس نظيف زي اللي بيتبعت في الـ axios
         headers: { 
-          Authorization: `Token ${token}`,
-          authorization: `Token ${token}`
+          Authorization: `Token ${token}`
         },
       },
     });
@@ -45,17 +53,22 @@ export const useChat = (roomId: string) => {
     const channel = pusher.subscribe(`private-chat_${roomId}`);
 
     channel.bind('new_message', (newMsg: any) => {
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => Array.isArray(prev) ? [...prev, newMsg] : [newMsg]);
     });
 
     channel.bind('messages_read', () => {
-      setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })));
+      setMessages((prev) => Array.isArray(prev) ? prev.map((msg) => ({ ...msg, is_read: true })) : []);
     });
 
+    // 🚀 التخلص من الإيرور الخاص بالـ WebSocket Closing State
     return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
-      pusher.disconnect();
+        try {
+            channel.unbind_all();
+            channel.unsubscribe();
+            pusher.disconnect();
+        } catch (e) {
+            console.error("Pusher cleanup error:", e);
+        }
     };
   }, [roomId]);
 
@@ -63,11 +76,7 @@ export const useChat = (roomId: string) => {
     try {
       await api.post(`chat/rooms/${roomId}/messages/`, { content });
     } catch (error: any) {
-      if (error.response?.data?.content) {
-        alert(error.response.data.content[0]);
-      } else if (error.response?.data?.detail) {
-        alert(error.response.data.detail);
-      }
+      if (error.response?.data?.content) alert(error.response.data.content[0]);
     }
   };
 
