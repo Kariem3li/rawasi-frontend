@@ -12,21 +12,20 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        // المسار هنا صحيح 100% بناءً على إعدادات axios الخاصة بك
-        const response = await api.get('chat/rooms/');
+        // ✅ التعديل هنا: إضافة /api في الأول عشان مسار الباك إند يكون سليم
+        const response = await api.get('/api/chat/rooms/');
         setRooms(response.data);
       } catch (error) {
-        console.error(error);
+        console.error("خطأ في جلب الغرف:", error);
       }
     };
     fetchRooms();
   }, []);
 
   return (
-    // تم إضافة overflow-hidden و dvh لمنع تمدد الشاشة لأسفل واختفاء مربع الكتابة
     <div className="flex h-[calc(100dvh-80px)] bg-white border-t border-gray-200 overflow-hidden" dir="rtl">
       
-      {/* القائمة الجانبية للمحادثات */}
+      {/* القائمة الجانبية */}
       <div className={`${isRootChat ? 'block' : 'hidden'} md:block w-full md:w-1/3 lg:w-1/4 border-l border-gray-200 bg-white overflow-y-auto h-full`}>
         <div className="p-4 bg-gray-50 border-b border-gray-200 sticky top-0 font-bold text-lg text-gray-800 z-10">
           المحادثات
@@ -49,7 +48,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* منطقة عرض المحادثة النشطة */}
-      {/* إضافة h-full و overflow-hidden هنا هي السحر الذي يثبت مربع الإدخال */}
       <div className={`${!isRootChat ? 'block' : 'hidden'} md:block w-full md:w-2/3 lg:w-3/4 h-full bg-[#efeae2] relative overflow-hidden`}>
         {children}
       </div>

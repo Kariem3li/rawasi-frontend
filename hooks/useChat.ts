@@ -16,12 +16,12 @@ export const useChat = (roomId: string) => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        // تم إزالة الشرطة المائلة الأولى من هنا: 'chat/rooms/...' بدلاً من '/chat/rooms/...'
-        const response = await api.get(`chat/rooms/${roomId}/messages/`);
+        // ✅ التعديل هنا: إضافة /api/ في الأول
+        const response = await api.get(`/api/chat/rooms/${roomId}/messages/`);
         setMessages(response.data);
         
-        // تم إزالة الشرطة المائلة الأولى من هنا أيضاً
-        await api.post(`chat/rooms/${roomId}/read/`); 
+        // ✅ التعديل هنا: إضافة /api/ في الأول
+        await api.post(`/api/chat/rooms/${roomId}/read/`); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
       } finally {
@@ -33,8 +33,8 @@ export const useChat = (roomId: string) => {
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      // هنا الـ URL بياخد الـ API URL كامل من ملف البيئة
-      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/chat/pusher/auth/`, 
+      // ✅ التعديل هنا: التأكد من المسار الصحيح
+      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/pusher/auth/`, 
       auth: {
         headers: { Authorization: `Token ${localStorage.getItem('token')}` },
       },
@@ -59,8 +59,8 @@ export const useChat = (roomId: string) => {
 
   const sendMessage = async (content: string) => {
     try {
-      // تم إزالة الشرطة المائلة الأولى من هنا أيضاً
-      await api.post(`chat/rooms/${roomId}/messages/`, { content });
+      // ✅ التعديل هنا: إضافة /api/ في الأول
+      await api.post(`/api/chat/rooms/${roomId}/messages/`, { content });
     } catch (error: any) {
       if (error.response?.data?.content) {
         alert(error.response.data.content[0]);

@@ -1,9 +1,9 @@
 import axios from 'axios';
 import Cookies from 'js-cookie'; 
-import { API_URL } from './config';
 
+// ✅ التعديل هنا: استخدام الرابط الأساسي مباشرة من .env.local
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL, 
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
