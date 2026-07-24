@@ -9,7 +9,7 @@ type Props = { params: Promise<{ id: string }> }
 async function getListingData(id: string) {
     try {
         // 🚀 2. استخدام ISR بدل no-store (الصفحة تفتح طلقة وتتحدث كل 60 ثانية)
-        const res = await fetch(`${API_URL}/listings/${id}/`, { 
+        const res = await fetch(`${API_URL}listings/${id}/`, { 
             next: { revalidate: 60 } 
         });
         if (!res.ok) return null;
