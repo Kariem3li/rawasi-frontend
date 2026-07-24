@@ -59,10 +59,15 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // 🚀 حماية إضافية: لو الرسالة موجودة أصلاً متكررهاش
           if (Array.isArray(prev) && prev.find(m => m.id === newMsg.id)) return prev;
           return Array.isArray(prev) ? [...prev, newMsg] : [newMsg];
       });
+      
+      // 🚀 السحر هنا: لو الرسالة دي مش بتاعتي (جاية من الطرف التاني) وأنا فاتح الشات حالاً
+      // اضرب API للباك إند قوله إني شفتها، عشان يبعت للطرف التاني إشعار الـ Seen فوراً!
+      if (!newMsg.is_me) {
+          api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
+      }
     });
 
     channel.bind('messages_read', () => {
