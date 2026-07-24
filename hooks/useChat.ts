@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Pusher from 'pusher-js';
 import api from '@/lib/axios';
+import { API_URL } from '@/lib/config';
 
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
@@ -16,12 +17,11 @@ export const useChat = (roomId: string) => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        // ✅ التعديل هنا: إضافة /api/ في الأول
-        const response = await api.get(`/chat/rooms/${roomId}/messages/`);
+        // مسار سليم بالكامل مع الـ Axios
+        const response = await api.get(`chat/rooms/${roomId}/messages/`);
         setMessages(response.data);
         
-        // ✅ التعديل هنا: إضافة /api/ في الأول
-        await api.post(`/chat/rooms/${roomId}/read/`); 
+        await api.post(`chat/rooms/${roomId}/read/`); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
       } finally {
@@ -33,8 +33,7 @@ export const useChat = (roomId: string) => {
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      // ✅ التعديل هنا: التأكد من المسار الصحيح
-      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/pusher/auth/`, 
+      authEndpoint: `${API_URL}chat/pusher/auth/`, 
       auth: {
         headers: { Authorization: `Token ${localStorage.getItem('token')}` },
       },
@@ -59,8 +58,7 @@ export const useChat = (roomId: string) => {
 
   const sendMessage = async (content: string) => {
     try {
-      // ✅ التعديل هنا: إضافة /api/ في الأول
-      await api.post(`/chat/rooms/${roomId}/messages/`, { content });
+      await api.post(`chat/rooms/${roomId}/messages/`, { content });
     } catch (error: any) {
       if (error.response?.data?.content) {
         alert(error.response.data.content[0]);
