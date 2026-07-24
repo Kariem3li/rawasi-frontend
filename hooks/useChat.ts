@@ -15,8 +15,14 @@ export const useChat = (roomId: string) => {
       try {
         setLoading(true);
         const response = await api.get(`chat/rooms/${roomId}/messages/`);
-        setMessages(Array.isArray(response.data) ? response.data : []);
-        await api.post(`chat/rooms/${roomId}/read/`); 
+        
+        // 🚀 السحر هنا: قراءة الداتا من results لو الـ Pagination شغال
+        const fetchedMessages = Array.isArray(response.data) 
+            ? response.data 
+            : (response.data?.results || []);
+            
+        setMessages(fetchedMessages);
+        await api.post(`chat/rooms/${roomId}/read/`).catch(() => {}); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
         setMessages([]);
@@ -43,7 +49,6 @@ export const useChat = (roomId: string) => {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
       authEndpoint: `${API_URL}chat/pusher/auth/`,
       auth: {
-        // 🚀 هيدر واحد بس نظيف زي اللي بيتبعت في الـ axios
         headers: { 
           Authorization: `Token ${token}`
         },
@@ -53,7 +58,11 @@ export const useChat = (roomId: string) => {
     const channel = pusher.subscribe(`private-chat_${roomId}`);
 
     channel.bind('new_message', (newMsg: any) => {
-      setMessages((prev) => Array.isArray(prev) ? [...prev, newMsg] : [newMsg]);
+      setMessages((prev) => {
+          // 🚀 حماية إضافية: لو الرسالة موجودة أصلاً متكررهاش
+          if (Array.isArray(prev) && prev.find(m => m.id === newMsg.id)) return prev;
+          return Array.isArray(prev) ? [...prev, newMsg] : [newMsg];
+      });
     });
 
     channel.bind('messages_read', () => {
@@ -74,7 +83,14 @@ export const useChat = (roomId: string) => {
 
   const sendMessage = async (content: string) => {
     try {
-      await api.post(`chat/rooms/${roomId}/messages/`, { content });
+      const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
+      
+      // 🚀 إظهار الرسالة في الشاشة فوراً بمجرد ما تتبعت للسرعة (Optimistic Update)
+      setMessages((prev) => {
+          if (Array.isArray(prev) && prev.find(m => m.id === res.data.id)) return prev;
+          return Array.isArray(prev) ? [...prev, res.data] : [res.data];
+      });
+      
     } catch (error: any) {
       if (error.response?.data?.content) alert(error.response.data.content[0]);
     }
