@@ -23,7 +23,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-80px)] bg-white border-t border-gray-200" dir="rtl">
+    <div className="flex h-[calc(100dvh-80px)] bg-white border-t border-gray-200" dir="rtl">
       {/* القائمة الجانبية للمحادثات (تختفي في الموبايل لو فاتحين غرفة) */}
       <div className={`${isRootChat ? 'block' : 'hidden'} md:block w-full md:w-1/3 lg:w-1/4 border-l border-gray-200 bg-white overflow-y-auto`}>
         <div className="p-4 bg-gray-50 border-b border-gray-200 sticky top-0 font-bold text-lg text-gray-800">
