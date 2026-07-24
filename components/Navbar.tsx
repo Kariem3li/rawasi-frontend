@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { User, LogIn, Menu, X, LogOut, Home, PlusSquare, ShieldAlert, Building2, Heart, FileSearch } from "lucide-react";
+import { User, LogIn, Menu, X, LogOut, Home, PlusSquare, ShieldAlert, Building2, Heart, FileSearch, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation"; 
 import NotificationBell from "./NotificationBell";
 import { Logo } from "./logo"; 
 import { useAuth } from "@/providers/AuthProvider"; 
 import UploadIndicator from "./UploadIndicator"; 
+import Pusher from 'pusher-js';
+import api from '@/lib/axios';
+import { API_URL } from '@/lib/config';
 
 export default function Navbar() {
   const router = useRouter(); 
@@ -16,8 +19,9 @@ export default function Navbar() {
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
-  // قفل السكرول لما المنيو تفتح
   useEffect(() => {
     if (isSidebarOpen || showAuthModal) {
       document.body.style.overflow = 'hidden';
@@ -27,11 +31,63 @@ export default function Navbar() {
     return () => { document.body.style.overflow = 'auto'; };
   }, [isSidebarOpen, showAuthModal]);
 
-  // إغلاق المنيو عند تغيير الصفحة
   useEffect(() => {
     setIsSidebarOpen(false);
     setShowAuthModal(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+        setUnreadChatCount(0);
+        return;
+    }
+
+    let pusherInstance: Pusher | null = null;
+    let globalChannel: any = null;
+
+    const setupChatNotifications = async () => {
+        try {
+            const res = await api.get('chat/unread-count/').catch(() => ({ data: { unread_count: 0 } }));
+            setUnreadChatCount(res.data.unread_count || 0);
+
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+            
+            // 🚀 تجاوز آمن لـ TypeScript عشان يقبل الـ id
+            const userId = (user as any)?.id;
+            
+            if (!token || !userId) return;
+
+            pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
+                cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
+                authEndpoint: `${API_URL}chat/pusher/auth/`,
+                auth: { headers: { Authorization: `Token ${token}` } },
+            });
+
+            globalChannel = pusherInstance.subscribe(`private-user_${userId}`);
+            
+            globalChannel.bind('new_message_notification', () => {
+                if (!pathname.startsWith('/chat')) {
+                    setUnreadChatCount((prev) => prev + 1);
+                }
+            });
+
+        } catch (error) {
+            console.error("Error setting up chat notifications:", error);
+        }
+    };
+
+    setupChatNotifications();
+
+    return () => {
+        if (globalChannel) {
+            globalChannel.unbind_all();
+            globalChannel.unsubscribe();
+        }
+        if (pusherInstance) {
+            pusherInstance.disconnect();
+        }
+    };
+  }, [isAuthenticated, (user as any)?.id, pathname]);
 
   const handleLogout = () => {
       if(window.confirm("هل تريد بالفعل تسجيل الخروج؟")) {
@@ -89,10 +145,18 @@ export default function Navbar() {
                   <PlusSquare className="w-4 h-4"/> أضف عقارك
               </button>
 
-              {/* 🚀 الـ animate-in بيخلي ظهور اليوزر ناعم وبيمنع الوميض المزعج وقت الـ Hydration */}
               <div className="animate-in fade-in duration-500 flex items-center gap-3">
                 {isAuthenticated ? (
                   <>
+                      <button onClick={(e) => handleProtectedClick(e, '/chat')} className="relative p-2 rounded-full text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors active:scale-95" aria-label="الرسائل">
+                          <MessageCircle className="w-6 h-6" />
+                          {unreadChatCount > 0 && (
+                              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black flex items-center justify-center rounded-full border border-white">
+                                  {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                              </span>
+                          )}
+                      </button>
+
                       <NotificationBell />
                       <Link href="/profile" className="relative group" aria-label="الملف الشخصي">
                           <div className="absolute -inset-1 bg-amber-500/30 rounded-full blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
@@ -108,7 +172,6 @@ export default function Navbar() {
                 )}
               </div>
 
-              {/* 🚀 إضافة aria-label */}
               <button onClick={() => setIsSidebarOpen(true)} aria-label="فتح القائمة" className="p-2 rounded-xl md:hidden active:scale-95 transition text-slate-800 hover:bg-gray-100 bg-gray-50 border border-gray-100">
                 <Menu className="w-6 h-6" strokeWidth={2.5} />
               </button>
@@ -124,7 +187,6 @@ export default function Navbar() {
         aria-hidden="true"
       ></div>
 
-      {/* القائمة الجانبية (Sidebar) */}
       <div className={`md:hidden fixed top-0 right-0 h-[100dvh] w-[85%] max-w-[320px] bg-white z-[9991] shadow-2xl transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
           <div className="flex flex-col h-full p-6 relative">
               <div className="flex justify-between items-center mb-8">
@@ -132,7 +194,6 @@ export default function Navbar() {
                     <h2 className="text-2xl font-black text-slate-900">القائمة</h2>
                     <p className="text-xs text-gray-400 font-bold mt-1">تصفح أقسام الموقع</p>
                   </div>
-                  {/* 🚀 إضافة aria-label */}
                   <button onClick={() => setIsSidebarOpen(false)} aria-label="إغلاق القائمة" className="p-2 bg-gray-50 text-slate-400 rounded-full hover:bg-red-50 hover:text-red-500 transition shadow-sm border border-gray-100">
                     <X className="w-5 h-5" />
                   </button>
@@ -162,8 +223,15 @@ export default function Navbar() {
                   <Link href="/" className="flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300" onClick={() => setIsSidebarOpen(false)}><Home className="w-5 h-5"/> الرئيسية</Link>
                   <button onClick={(e) => handleProtectedClick(e, '/my-listings')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300"><Building2 className="w-5 h-5"/> إعلاناتي</button>
                   <button onClick={(e) => handleProtectedClick(e, '/saved')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300"><Heart className="w-5 h-5"/> المفضلة</button>
-                  <button onClick={(e) => handleProtectedClick(e, '/add-property')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-amber-50 text-amber-600 font-bold hover:bg-amber-500 hover:text-slate-900 transition-all duration-300"><PlusSquare className="w-5 h-5"/> أضف عقار</button>
+                  
+                  <button onClick={(e) => handleProtectedClick(e, '/chat')} className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-amber-50 text-amber-700 font-bold hover:bg-amber-500 hover:text-slate-900 transition-all duration-300">
+                      <div className="flex items-center gap-4"><MessageCircle className="w-5 h-5"/> الرسائل</div>
+                      {unreadChatCount > 0 && <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">{unreadChatCount}</span>}
+                  </button>
+
+                  <button onClick={(e) => handleProtectedClick(e, '/add-property')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300"><PlusSquare className="w-5 h-5"/> أضف عقار</button>
                   <Link href="/waivers" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-blue-50 text-blue-700 font-bold hover:bg-blue-600 hover:text-white transition-all duration-300 border border-blue-100/50"><FileSearch className="w-5 h-5"/> الاستعلام عن التنازلات</Link>
+                  
                   {!isAuthenticated && (
                     <Link href="/login" className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-all duration-300 mt-6 shadow-md" onClick={() => setIsSidebarOpen(false)}><LogIn className="w-5 h-5"/> تسجيل الدخول</Link>
                   )}
@@ -179,7 +247,6 @@ export default function Navbar() {
           </div>
       </div>
 
-      {/* الـ Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowAuthModal(false)} aria-hidden="true"></div>
