@@ -1,12 +1,9 @@
-export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://192.168.1.5:3000";
+// بناخد الرابط الأساسي (لأغراض زي تجميع الصور)
+export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://rawasi1-production.up.railway.app";
 
-const rawBackendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.5:8000";
-
-// بننضف الرابط من أي /api أو سلاش زيادة في الآخر
-const cleanBackendUrl = rawBackendUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
-
-// 🚀 السلاش اللي في الآخر دي (/) هي سر حل المشكلة عشان Axios يدمج الروابط صح
-export const API_URL = `${cleanBackendUrl}/api/`;
+// بناخد رابط الـ API (اللي آخره /api) ونضمن إن مفيش سلاش زيادة في الآخر
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://rawasi1-production.up.railway.app/api";
+export const API_URL = rawApiUrl.replace(/\/$/, '');
 
 export const getFullImageUrl = (imagePath: string | null | undefined): string => {
     if (!imagePath) return "https://placehold.co/800x600/e2e8f0/475569?text=No+Image";
@@ -22,8 +19,7 @@ export const getFullImageUrl = (imagePath: string | null | undefined): string =>
 
     cleanPath = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
     
-    // منع إضافة الرابط مرتين لو الصورة مسارها كامل
-    if (cleanPath.startsWith(cleanBackendUrl)) return cleanPath;
+    if (cleanPath.startsWith(BASE_URL)) return cleanPath;
 
-    return `${cleanBackendUrl}${cleanPath}`;
+    return `${BASE_URL}${cleanPath}`;
 };

@@ -12,18 +12,16 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    // --- [ الفلتر السحري لحل مشكلة مسارات Axios كلها ] ---
     if (config.url) {
-      // 1. لو الرابط بيبدأ بسلاش (/) بنشيله عشان Axios مايمسحش الـ /api من الرابط الأساسي
+      // لو الرابط المكتوب بيبدأ بسلاش، شيله عشان يندمج صح مع baseURL (اللي مفيش في آخره سلاش)
       if (config.url.startsWith('/')) {
         config.url = config.url.substring(1);
       }
-      // 2. لو الرابط بيبدأ بـ api/ بنشيلها عشان نمنع تكرار /api/api/
+      // لو الرابط المكتوب بيبدأ بـ api/، شيله عشان الـ baseURL أصلاً فيه /api
       if (config.url.startsWith('api/')) {
         config.url = config.url.substring(4);
       }
     }
-    // ----------------------------------------------------
 
     if (typeof window !== 'undefined') {
       const token = Cookies.get('token') || localStorage.getItem('token') || sessionStorage.getItem('token');
