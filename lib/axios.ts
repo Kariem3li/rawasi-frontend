@@ -12,16 +12,18 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    // --- [ الفلتر السحري لمنع أي تكرار لـ api/ في الشات أو غيره ] ---
     if (config.url) {
-      // لو الرابط بيبدأ بسلاش، شيله عشان ما يبوظش دمج الـ baseURL
-      if (config.url.startsWith('/')) {
+      // لو مسار الطلب مبعوت فيه api في الأول بالغلط، بنشيله عشان ميتكرش مع baseURL
+      if (config.url.startsWith('/api/')) {
+        config.url = config.url.substring(5);
+      } else if (config.url.startsWith('api/')) {
+        config.url = config.url.substring(4);
+      } else if (config.url.startsWith('/')) {
         config.url = config.url.substring(1);
       }
-      // لو الرابط بيبدأ بـ api/ شيلها عشان الـ baseURL أصلاً فيه /api/
-      if (config.url.startsWith('api/')) {
-        config.url = config.url.substring(4);
-      }
     }
+    // -------------------------------------------------------------
 
     if (typeof window !== 'undefined') {
       const token = Cookies.get('token') || localStorage.getItem('token') || sessionStorage.getItem('token');
