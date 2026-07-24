@@ -15,19 +15,30 @@ export default function ChatWindow({ roomId }: { roomId: string }) {
   if (loading) return <div className="flex items-center justify-center h-full">جاري التحميل...</div>;
 
   return (
-    <div className="relative w-full h-full bg-[#efeae2]" dir="rtl">
-      {/* منطقة الرسائل: متثبتة فوق وسايبة 75 بيكسل تحت عشان مربع الكتابة */}
-      <div className="absolute top-0 left-0 right-0 bottom-[75px] overflow-y-auto p-4 md:p-6 pb-20">
+    /* خلينا الحاوية fixed عشان تملأ الشاشة بالكامل ومحدش يقدر يخفيها */
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#efeae2]" dir="rtl">
+      
+      {/* هيدر بسيط عشان تقدري تقفلي الشات وترجعي للموقع (مهم جداً عشان الـ fixed) */}
+      <div className="bg-white p-4 border-b flex items-center justify-between shrink-0 shadow-sm">
+         <h2 className="font-bold text-lg">المحادثة</h2>
+         <button onClick={() => window.history.back()} className="text-gray-500 hover:text-red-500">
+           إغلاق ✕
+         </button>
+      </div>
+
+      {/* منطقة الرسائل بتاخد باقي المساحة وتعمل سكرول */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
         {messages.map((msg) => (
           <MessageBubble key={msg.id} msg={msg} />
         ))}
         <div ref={bottomRef} />
       </div>
 
-      {/* مربع الكتابة: متثبت إجبارياً في الأسفل */}
-      <div className="absolute bottom-0 left-0 right-0 z-50">
+      {/* مربع الكتابة */}
+      <div className="shrink-0 bg-white">
         <ChatInput onSendMessage={sendMessage} />
       </div>
+      
     </div>
   );
 }
