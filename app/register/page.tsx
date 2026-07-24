@@ -16,7 +16,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/providers/AuthProvider";
-// 🚀 Zod Schema بضمان تطابق الباسورد والتحقق الكامل
+
 const registerSchema = z.object({
   firstName: z.string().min(2, "الاسم الأول قصير جداً"),
   lastName: z.string().min(2, "الاسم الأخير قصير جداً"),
@@ -26,7 +26,7 @@ const registerSchema = z.object({
   confirmPassword: z.string()
 }).refine((data) => data.password === data.confirmPassword, {
   message: "كلمات المرور غير متطابقة",
-  path: ["confirmPassword"], // لإظهار الإيرور تحت حقل التأكيد
+  path: ["confirmPassword"],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -34,7 +34,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function Register() {
   const router = useRouter();
   const { contactInfo } = useContactInfo();
-  const { login } = useAuth(); // 👈 2. استدعاء دالة الـ login من البروفايدر
+  const { login } = useAuth(); 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -64,18 +64,25 @@ export default function Register() {
               phone_number: data.phone,
               password: data.password
           });
+          
           const token = loginRes.data.token;
           const fullName = `${data.firstName} ${data.lastName}`;
+          const isStaff = !!loginRes.data.is_staff;
 
-          // 🚀 3. تحديث الـ Global State والـ Headers (زي صفحة اللوجين بالظبط)
-          login(token, fullName, false, false); // isStaff = false, rememberMe = false
+          // 🚀 3. استخراج الـ ID بطريقة صحيحة من loginRes 
+          const userId = loginRes.data.user?.id || loginRes.data.id || "0";
+          
+          // 🚀 4. تشغيل الدالة الاحترافية كاملة بـ 5 متغيرات
+          login(token, userId, fullName, isStaff, false); 
+          
           api.defaults.headers.common['Authorization'] = `Token ${token}`;
-          // حفظ التوكن بأمان
-          Cookies.set("token", loginRes.data.token, { 
+          
+          Cookies.set("token", token, { 
               secure: process.env.NODE_ENV === "production",
               sameSite: "strict" 
           });
-          localStorage.setItem("username", `${data.firstName} ${data.lastName}`);
+          
+          localStorage.setItem("username", fullName);
 
           setIsSuccess(true);
           toast.success("تم إنشاء الحساب بنجاح! جاري تحويلك...");
