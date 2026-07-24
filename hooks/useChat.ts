@@ -8,10 +8,14 @@ export const useChat = (roomId: string) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId) {
+      setLoading(false);
+      return;
+    }
 
     const fetchMessages = async () => {
       try {
+        setLoading(true);
         const response = await api.get(`chat/rooms/${roomId}/messages/`);
         setMessages(response.data);
         await api.post(`chat/rooms/${roomId}/read/`); 
@@ -24,12 +28,17 @@ export const useChat = (roomId: string) => {
 
     fetchMessages();
 
-    // إعداد Pusher
+    // جلب التوكن بطريقة آمنة
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || sessionStorage.getItem('token') : '';
+
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/pusher/auth/`,
+      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/chat/pusher/auth/`,
       auth: {
-        headers: { Authorization: `Token ${localStorage.getItem('token')}` },
+        headers: { 
+          Authorization: `Token ${token}`,
+          authorization: `Token ${token}`
+        },
       },
     });
 
@@ -56,6 +65,8 @@ export const useChat = (roomId: string) => {
     } catch (error: any) {
       if (error.response?.data?.content) {
         alert(error.response.data.content[0]);
+      } else if (error.response?.data?.detail) {
+        alert(error.response.data.detail);
       }
     }
   };
