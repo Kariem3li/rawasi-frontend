@@ -21,7 +21,8 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           ? response.data 
           : (response.data?.results || []);
           
-        setRooms(fetchedRooms);
+        // 🚀 الفلتر ده هيخفي أي غرفة مفيهاش رسايل تماماً
+        setRooms(fetchedRooms.filter((room: any) => room.last_message !== null));
       } catch (error) {
         console.error("خطأ في جلب الغرف:", error);
         setRooms([]);
