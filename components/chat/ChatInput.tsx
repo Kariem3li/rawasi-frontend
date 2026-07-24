@@ -12,7 +12,7 @@ export default function ChatInput({ onSendMessage }: { onSendMessage: (text: str
   };
 
   return (
-    <div className="bg-white p-3 border-t border-gray-200">
+    <div className="bg-white p-3 border-t border-gray-200 shrink-0 w-full z-10 shadow-sm">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"

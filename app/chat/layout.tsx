@@ -47,7 +47,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* منطقة عرض المحادثة النشطة (تظهر في الموبايل لو فاتحين غرفة) */}
-      <div className={`${!isRootChat ? 'block' : 'hidden'} md:block w-full md:w-2/3 lg:w-3/4 bg-[#efeae2] relative`}>
+      <div className={`${!isRootChat ? 'block' : 'hidden'} md:block w-full md:w-2/3 lg:w-3/4 bg-[#efeae2] relative overflow-hidden`}>
         {children}
       </div>
     </div>

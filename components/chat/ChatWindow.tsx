@@ -15,7 +15,7 @@ export default function ChatWindow({ roomId }: { roomId: string }) {
   if (loading) return <div className="flex items-center justify-center h-full">جاري التحميل...</div>;
 
   return (
-    <div className="flex flex-col h-full bg-[#efeae2] relative" dir="rtl">
+    <div className="flex flex-col absolute inset-0 bg-[#efeae2]" dir="rtl">
       {/* منطقة الرسائل */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
         {messages.map((msg) => (
