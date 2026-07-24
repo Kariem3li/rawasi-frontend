@@ -27,7 +27,7 @@ export const useChat = (roomId: string) => {
     // إعداد Pusher
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/chat/pusher/auth/`,
+      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/api/chat/pusher/auth/`,
       auth: {
         headers: { Authorization: `Token ${localStorage.getItem('token')}` },
       },
