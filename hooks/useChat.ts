@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Pusher from 'pusher-js';
-import api from '@/lib/axios'; // بيقرأ من ملفك الأصلي
+import api from '@/lib/axios';
 
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
@@ -12,9 +12,9 @@ export const useChat = (roomId: string) => {
 
     const fetchMessages = async () => {
       try {
-        const response = await api.get(`/chat/rooms/${roomId}/messages/`);
+        const response = await api.get(`chat/rooms/${roomId}/messages/`);
         setMessages(response.data);
-        await api.post(`/chat/rooms/${roomId}/read/`); 
+        await api.post(`chat/rooms/${roomId}/read/`); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
       } finally {
@@ -52,7 +52,7 @@ export const useChat = (roomId: string) => {
 
   const sendMessage = async (content: string) => {
     try {
-      await api.post(`/chat/rooms/${roomId}/messages/`, { content });
+      await api.post(`chat/rooms/${roomId}/messages/`, { content });
     } catch (error: any) {
       if (error.response?.data?.content) {
         alert(error.response.data.content[0]);

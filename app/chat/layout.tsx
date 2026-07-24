@@ -12,8 +12,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        // تم مسح كلمة /api من هنا عشان تشتغل صح
-        const response = await api.get('/chat/rooms/');
+        const response = await api.get('chat/rooms/');
         setRooms(response.data);
       } catch (error) {
         console.error(error);
