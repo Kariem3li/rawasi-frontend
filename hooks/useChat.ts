@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Pusher from 'pusher-js';
 import api from '@/lib/axios';
-
+import { API_URL } from '@/lib/config'; // 🚀 استدعينا الرابط المتين من الكونفيج
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,7 @@ export const useChat = (roomId: string) => {
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      authEndpoint: `${process.env.NEXT_PUBLIC_API_URL}/chat/pusher/auth/`,
+      authEndpoint: `${API_URL}/chat/pusher/auth/`,
       auth: {
         headers: { 
           Authorization: `Token ${token}`,
