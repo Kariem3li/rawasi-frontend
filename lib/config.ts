@@ -1,12 +1,12 @@
 export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://192.168.1.5:3000";
 
-// استخلاص رابط الباك إند الأساسي وضمان وجود /api في الـ API_URL تلقائياً
 const rawBackendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.5:8000";
 
-// لو الرابط فيه /api في الآخر بنشيله ونظبطه عشان ميتكررش، وبعدين نضيفه بانتظام
-const cleanBackendUrl = rawBackendUrl.replace(/\/api\/?$/, '');
+// بننضف الرابط من أي /api أو سلاش زيادة في الآخر
+const cleanBackendUrl = rawBackendUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
-export const API_URL = `${cleanBackendUrl}/api`;
+// 🚀 السلاش اللي في الآخر دي (/) هي سر حل المشكلة عشان Axios يدمج الروابط صح
+export const API_URL = `${cleanBackendUrl}/api/`;
 
 export const getFullImageUrl = (imagePath: string | null | undefined): string => {
     if (!imagePath) return "https://placehold.co/800x600/e2e8f0/475569?text=No+Image";
