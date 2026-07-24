@@ -12,17 +12,6 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    if (config.url) {
-      // لو الرابط المكتوب بيبدأ بسلاش، شيله عشان يندمج صح مع baseURL (اللي مفيش في آخره سلاش)
-      if (config.url.startsWith('/')) {
-        config.url = config.url.substring(1);
-      }
-      // لو الرابط المكتوب بيبدأ بـ api/، شيله عشان الـ baseURL أصلاً فيه /api
-      if (config.url.startsWith('api/')) {
-        config.url = config.url.substring(4);
-      }
-    }
-
     if (typeof window !== 'undefined') {
       const token = Cookies.get('token') || localStorage.getItem('token') || sessionStorage.getItem('token');
       if (token) {
