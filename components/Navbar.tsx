@@ -8,9 +8,9 @@ import NotificationBell from "./NotificationBell";
 import { Logo } from "./logo"; 
 import { useAuth } from "@/providers/AuthProvider"; 
 import UploadIndicator from "./UploadIndicator"; 
-import Pusher from 'pusher-js';
-import api from '@/lib/axios';
-import { API_URL } from '@/lib/config';
+
+// 🚀 استدعاء الهوك العالمي الجديد اللي بيتحكم في الشات والعداد
+import { useGlobalChat } from '@/hooks/useGlobalChat';
 
 export default function Navbar() {
   const router = useRouter(); 
@@ -20,8 +20,8 @@ export default function Navbar() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   
-  // 🚀 حالة لعداد رسائل الشات غير المقروءة
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  // 🚀 سحب العداد من الهوك العالمي
+  const { unreadCount } = useGlobalChat();
 
   // قفل السكرول لما المنيو تفتح
   useEffect(() => {
@@ -38,63 +38,6 @@ export default function Navbar() {
     setIsSidebarOpen(false);
     setShowAuthModal(false);
   }, [pathname]);
-
-  // 🚀 جلب عدد الرسايل غير المقروءة وربط البوشر العام
-  useEffect(() => {
-    if (!isAuthenticated) {
-        setUnreadChatCount(0);
-        return;
-    }
-
-    let pusherInstance: Pusher | null = null;
-    let globalChannel: any = null;
-
-    const setupChatNotifications = async () => {
-        try {
-            // 1. جلب العدد الأولي من الباك إند
-            // (بافتراض إنك هتعملي endpoint بيرجع { unread_count: 5 })
-            // لو معندكيش الـ endpoint ده حالياً، الكود مش هيضرب هيكمل عادي
-            const res = await api.get('chat/unread-count/').catch(() => ({ data: { unread_count: 0 } }));
-            setUnreadChatCount(res.data.unread_count || 0);
-
-            // 2. ربط البوشر العام لليوزر عشان يسمع أي رسالة في أي غرفة
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
-            if (!token || !user?.id) return;
-
-            pusherInstance = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
-                cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-                authEndpoint: `${API_URL}chat/pusher/auth/`,
-                auth: { headers: { Authorization: `Token ${token}` } },
-            });
-
-            // اليوزر بيشترك في قناة خاصة بيه هو بس
-            globalChannel = pusherInstance.subscribe(`private-user_${user.id}`);
-            
-            // لما تيجي رسالة جديدة، بنزود العداد
-            globalChannel.bind('new_message_notification', () => {
-                // لو اليوزر مش فاتح صفحة الشات دلوقتي، زوّد العداد
-                if (!pathname.startsWith('/chat')) {
-                    setUnreadChatCount((prev) => prev + 1);
-                }
-            });
-
-        } catch (error) {
-            console.error("Error setting up chat notifications:", error);
-        }
-    };
-
-    setupChatNotifications();
-
-    return () => {
-        if (globalChannel) {
-            globalChannel.unbind_all();
-            globalChannel.unsubscribe();
-        }
-        if (pusherInstance) {
-            pusherInstance.disconnect();
-        }
-    };
-  }, [isAuthenticated, user?.id, pathname]);
 
   const handleLogout = () => {
       if(window.confirm("هل تريد بالفعل تسجيل الخروج؟")) {
@@ -158,9 +101,10 @@ export default function Navbar() {
                       {/* 🚀 أيقونة الشات الجديدة */}
                       <button onClick={(e) => handleProtectedClick(e, '/chat')} className="relative p-2 rounded-full text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors active:scale-95" aria-label="الرسائل">
                           <MessageCircle className="w-6 h-6" />
-                          {unreadChatCount > 0 && (
+                          {/* 🚀 استخدام العداد الجديد */}
+                          {unreadCount > 0 && (
                               <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black flex items-center justify-center rounded-full border border-white">
-                                  {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                                  {unreadCount > 99 ? '99+' : unreadCount}
                               </span>
                           )}
                       </button>
@@ -236,7 +180,8 @@ export default function Navbar() {
                   {/* 🚀 أيقونة الشات في الموبايل */}
                   <button onClick={(e) => handleProtectedClick(e, '/chat')} className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-amber-50 text-amber-700 font-bold hover:bg-amber-500 hover:text-slate-900 transition-all duration-300">
                       <div className="flex items-center gap-4"><MessageCircle className="w-5 h-5"/> الرسائل</div>
-                      {unreadChatCount > 0 && <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">{unreadChatCount}</span>}
+                      {/* 🚀 استخدام العداد الجديد هنا برضو */}
+                      {unreadCount > 0 && <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">{unreadCount}</span>}
                   </button>
 
                   <button onClick={(e) => handleProtectedClick(e, '/add-property')} className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-gray-50 text-slate-700 font-bold hover:bg-slate-900 hover:text-white transition-all duration-300"><PlusSquare className="w-5 h-5"/> أضف عقار</button>
