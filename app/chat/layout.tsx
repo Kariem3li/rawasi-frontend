@@ -4,17 +4,13 @@ import Link from 'next/link';
 import api from '@/lib/axios';
 import { usePathname } from 'next/navigation';
 import { MessageCircle } from 'lucide-react';
-import Pusher from 'pusher-js';
-import { API_URL } from '@/lib/config';
-import { useAuth } from '@/providers/AuthProvider';
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const [rooms, setRooms] = useState<any[]>([]);
   const pathname = usePathname();
   const isRootChat = pathname === '/chat' || pathname === '/chat/';
-  const { user } = useAuth(); // 🚀 جلب المستخدم
 
-  // 🚀 فصلنا جلب الغرف في دالة عشان نعرف نناديها من جوه البوشر
+  // جلب الغرف وتصفيتها
   const fetchRooms = useCallback(async () => {
     try {
       const response = await api.get('chat/rooms/');
@@ -31,44 +27,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     fetchRooms();
-  }, [fetchRooms, pathname]);
 
-  // 🚀 البوشر اللي بيتصنت على إشعاراتك وإنت فاتح أي صفحة في الشات
-  useEffect(() => {
-    const currentUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
-    if (!currentUserId) return;
-
-    let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
-    if (!token && typeof document !== 'undefined') {
-        const match = document.cookie.match(/(^| )token=([^;]+)/);
-        if (match) token = match[2];
-    }
-    if (!token) return;
-
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
-      authEndpoint: `${API_URL}chat/pusher/auth/`,
-      auth: { headers: { Authorization: `Token ${token}` } },
-    });
-
-    const globalChannel = pusher.subscribe(`private-user_${currentUserId}`);
-
-    globalChannel.bind('new_message_notification', (data: any) => {
-      // 1. حدث اللستة عشان النقطة الحمرا تنور
-      fetchRooms();
-
-      // 2. قول للباك إند "أنا استلمت الرسالة" عشان يعمل للمرسل صحين رمادي
-      if (data && data.id) {
-          api.post(`chat/messages/${data.id}/delivered/`).catch((e) => console.log(e));
-      }
-    });
+    // 🚀 الاستماع للحدث العالمي اللي بييجي من useGlobalChat.ts لتحديث النقطة الحمراء
+    const handleUpdate = () => fetchRooms();
+    window.addEventListener('chat_rooms_updated', handleUpdate);
 
     return () => {
-        globalChannel.unbind_all();
-        globalChannel.unsubscribe();
-        pusher.disconnect();
+        window.removeEventListener('chat_rooms_updated', handleUpdate);
     };
-  }, [user?.id, fetchRooms]);
+  }, [fetchRooms, pathname]);
 
   return (
     <div className="flex h-[calc(100vh-75px)] mt-[75px] bg-white overflow-hidden" dir="rtl">
@@ -105,7 +72,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                             {room.last_message?.content || "لا توجد رسائل"}
                         </p>
                         
-                        {/* النقطة الحمرا */}
                         {room.unread_count > 0 && (
                             <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shrink-0">
                                 {room.unread_count}
@@ -123,7 +89,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
 
-      {/* منطقة عرض المحادثة النشطة */}
       <div className={`${!isRootChat ? 'block' : 'hidden'} md:block flex-1 bg-[#efeae2] relative h-full`}>
         {children}
       </div>
