@@ -19,6 +19,22 @@ export const useChat = (roomId: string) => {
     }
   }, [user]);
 
+  // 🚀 دالة تعليم الغرفة كمقروءة وتحديث النافبار والقائمة الجانبية فوراً
+  const markRoomAsRead = useCallback(async () => {
+      if (!roomId) return;
+      try {
+          await api.post(`chat/rooms/${roomId}/read/`);
+          if (typeof window !== 'undefined') {
+              // بنقول للقائمة الجانبية تحدث نفسها (عشان تشيل النقطة الحمرا من الشات ده)
+              window.dispatchEvent(new Event('chat_rooms_updated'));
+              // بنقول للنافبار يجيب الرقم الجديد من السيرفر (عشان يقلل العداد العام)
+              window.dispatchEvent(new Event('update_global_counter'));
+          }
+      } catch (error) {
+          console.error("خطأ في تحديث حالة القراءة:", error);
+      }
+  }, [roomId]);
+
   const fetchMessages = useCallback(async () => {
     if (!roomId) return;
     try {
@@ -36,13 +52,16 @@ export const useChat = (roomId: string) => {
       }
 
       setMessages(fetchedMessages);
-      await api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
+      
+      // 🚀 أول ما الرسايل تحمل بنعلمها إنها اتقرأت ونضرب إشارة التحديث
+      markRoomAsRead();
+
     } catch (error) {
       console.error("خطأ في جلب الرسائل:", error);
     } finally {
       setLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, markRoomAsRead]);
 
   useEffect(() => {
     fetchMessages();
@@ -83,14 +102,14 @@ export const useChat = (roomId: string) => {
           const correctedMsg = { ...newMsg, is_me: isMine };
 
           if (!isMine) {
-             api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
+             // 🚀 لو إنت فاتح الغرفة ورسالة جاتلك، بنعلمها مقروءة ونحدث النافبار في نفس اللحظة
+             markRoomAsRead();
           }
 
           return [...prev, correctedMsg];
       });
     });
 
-    // 🚀 استقبال الصحين الرمادي
     channel.bind('message_delivered', (data: any) => {
       console.log("🔥 DEBUG FRONTEND: Received Double Tick event from Pusher!", data);
       setMessages((prev) => prev.map((msg) => 
@@ -98,7 +117,6 @@ export const useChat = (roomId: string) => {
       ));
     });
 
-    // 🚀 استقبال الصحين الملونين
     channel.bind('messages_read', () => {
       setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })));
     });
@@ -110,7 +128,7 @@ export const useChat = (roomId: string) => {
             pusher.disconnect();
         } catch (e) {}
     };
-  }, [roomId]);
+  }, [roomId, markRoomAsRead]);
 
   const sendMessage = async (content: string) => {
     try {
