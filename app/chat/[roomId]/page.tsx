@@ -6,8 +6,17 @@ export default function ChatRoomPage() {
   const params = useParams();
   const roomId = params?.roomId as string;
 
-  // لو الـ ID لسه مظهرش، بنستنى ثانية
-  if (!roomId) return <div className="flex items-center justify-center h-full w-full">جاري تهيئة الغرفة...</div>;
+  if (!roomId) {
+      return (
+          <div className="flex items-center justify-center h-full w-full bg-[#efeae2] text-slate-500 font-bold">
+              جاري تهيئة الغرفة...
+          </div>
+      );
+  }
 
-  return <ChatWindow roomId={roomId} />;
+  return (
+      <div className="h-full w-full flex flex-col overflow-hidden">
+          <ChatWindow roomId={roomId} />
+      </div>
+  );
 }

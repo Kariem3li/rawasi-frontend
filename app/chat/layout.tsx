@@ -10,7 +10,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const isRootChat = pathname === '/chat' || pathname === '/chat/';
 
-  // جلب الغرف وتصفيتها
   const fetchRooms = useCallback(async () => {
     try {
       const response = await api.get('chat/rooms/');
@@ -28,7 +27,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     fetchRooms();
 
-    // 🚀 الاستماع للحدث العالمي اللي بييجي من useGlobalChat.ts لتحديث النقطة الحمراء
     const handleUpdate = () => fetchRooms();
     window.addEventListener('chat_rooms_updated', handleUpdate);
 
@@ -38,10 +36,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }, [fetchRooms, pathname]);
 
   return (
-    <div className="flex h-[calc(100vh-75px)] mt-[75px] bg-white overflow-hidden" dir="rtl">
+    // 🚀 السحر هنا: fixed top-[75px] bottom-0 بتثبت الشات وتمنع السكرول الخارجي نهائياً
+    <div className="fixed top-[75px] bottom-0 left-0 right-0 flex bg-white overflow-hidden z-40" dir="rtl">
+      
       {/* القائمة الجانبية للمحادثات */}
-      <div className={`${isRootChat ? 'block' : 'hidden'} md:block w-full md:w-[350px] shrink-0 border-l border-gray-200 bg-white flex flex-col`}>
-        <div className="p-4 md:p-5 bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm flex items-center gap-2">
+      <div className={`${isRootChat ? 'flex' : 'hidden'} md:flex w-full md:w-[350px] shrink-0 border-l border-gray-200 bg-white flex-col h-full`}>
+        <div className="p-4 md:p-5 bg-white border-b border-gray-100 shrink-0 flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-amber-500" />
           <h2 className="font-black text-lg text-slate-800">الرسائل</h2>
         </div>
@@ -89,7 +89,8 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
 
-      <div className={`${!isRootChat ? 'block' : 'hidden'} md:block flex-1 bg-[#efeae2] relative h-full`}>
+      {/* منطقة عرض المحادثة النشطة */}
+      <div className={`${!isRootChat ? 'flex' : 'hidden'} md:flex flex-1 bg-[#efeae2] relative h-full flex-col overflow-hidden`}>
         {children}
       </div>
     </div>
