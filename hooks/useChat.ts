@@ -10,14 +10,27 @@ export const useChat = (roomId: string) => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
   
-  // 🚀 استخراج دقيق للـ ID الخاص بالمستخدم الحالي من كل الأماكن الممكنة
   const currentUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
 
-  // 🚀 دالة سحرية وظيفتها الوحيدة تحديد: دي رسالتي (يمين) ولا لأ (شمال)
-  const checkIsMe = (senderId: any, backendIsMe: boolean) => {
-     if (!senderId && backendIsMe !== undefined) return backendIsMe;
-     const normalizedSenderId = senderId?.id ? String(senderId.id) : String(senderId);
-     return normalizedSenderId === String(currentUserId);
+  // 🚀 دالة صارمة جداً مستحيل تغلط وتودي الرسايل يمين عمال على بطال
+  const checkIsMe = (msg: any) => {
+     // 1. لو الباك إند باعت is_me بشكل صريح
+     if (typeof msg.is_me === 'boolean') return msg.is_me;
+     
+     // 2. لو الـ ID بتاع اليوزر مش موجود أو undefined، مستحيل نعتبر الرسالة بتاعته (عشان متروحش يمين)
+     if (!currentUserId || String(currentUserId) === 'undefined' || String(currentUserId) === 'null') {
+         return false;
+     }
+     
+     // 3. لو الباك إند مش باعت الـ sender أصلاً في الرسالة
+     const sender = msg.sender;
+     if (!sender || String(sender) === 'undefined' || String(sender) === 'null') {
+         return false;
+     }
+
+     // 4. المقارنة السليمة 100%
+     const senderId = sender?.id ? String(sender.id) : String(sender);
+     return senderId === String(currentUserId);
   };
 
   useEffect(() => {
@@ -27,7 +40,6 @@ export const useChat = (roomId: string) => {
       try {
         setLoading(true);
         
-        // كسر الكاش عشان مفيش رسالة تتمسح بعد الريفريش
         const response = await api.get(`chat/rooms/${roomId}/messages/`, {
             params: { _t: new Date().getTime() } 
         });
@@ -36,15 +48,14 @@ export const useChat = (roomId: string) => {
             ? response.data 
             : (response.data?.results || []);
             
-        // 🚀 فرض السيطرة على اليمين والشمال بناءً على الـ ID مش كلام الباك إند
+        // 🚀 استخدام الدالة الصارمة
         const formattedMessages = fetchedMessages.map((msg: any) => ({
             ...msg,
-            is_me: checkIsMe(msg.sender, msg.is_me)
+            is_me: checkIsMe(msg)
         }));
             
         setMessages(formattedMessages);
         
-        // إشعار قراءة للرسائل
         await api.post(`chat/rooms/${roomId}/read/`).catch(() => {}); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
@@ -73,17 +84,14 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // حساب دقيق للرسالة الجاية من بوشر (يمين ولا شمال)
-          const actualIsMe = checkIsMe(newMsg.sender, newMsg.is_me);
+          const actualIsMe = checkIsMe(newMsg);
           const correctedMsg = { ...newMsg, is_me: actualIsMe };
           
-          // التأكد إنها مش متكررة
           const exists = prev.find(m => String(m.id) === String(correctedMsg.id));
           if (exists) {
               return prev.map(m => String(m.id) === String(correctedMsg.id) ? correctedMsg : m);
           }
           
-          // لو الرسالة جاية من الطرف التاني، نبلغ السيرفر إننا قرأناها فوراً
           if (!actualIsMe) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
@@ -93,7 +101,6 @@ export const useChat = (roomId: string) => {
     });
 
     channel.bind('messages_read', () => {
-      // تلوين كل الرسايل اللي في الشاشة لـ أزرق
       setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })));
     });
 
@@ -112,7 +119,6 @@ export const useChat = (roomId: string) => {
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
       
-      // 🚀 فرض سيطرة: الرسالة اللي أنا لسه دايس إرسال عليها بتاعتي 100%
       const myMsg = { ...res.data, is_me: true };
       
       setMessages((prev) => {
