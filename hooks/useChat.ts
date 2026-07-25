@@ -10,23 +10,9 @@ export const useChat = (roomId: string) => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
   
-  // 1. استخراج ID المستخدم الحالي بثبات
   const currentUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
 
-  // 2. دالة الحكم الصارمة: تحدد الرسالة يمين ولا شمال بناءً على الـ ID فقط
-  const checkIsMe = (msg: any, userId: any) => {
-     if (!userId) return false;
-     
-     // فحص المرسل سواء كان رقم أو Object
-     const sender = msg.sender;
-     if (!sender) return false;
-     
-     const senderId = typeof sender === 'object' ? String(sender.id) : String(sender);
-     return senderId === String(userId);
-  };
-
   useEffect(() => {
-    // 3. تأمين: لا تشغيل بدون ID الغرفة والـ User
     if (!roomId || !currentUserId) return;
 
     const fetchMessages = async () => {
@@ -36,19 +22,10 @@ export const useChat = (roomId: string) => {
             params: { _t: new Date().getTime() } 
         });
         
-        const fetchedMessages = Array.isArray(response.data) 
-            ? response.data 
-            : (response.data?.results || []);
-            
-        // 4. تنسيق الرسائل القادمة من الداتابيز
-        const formattedMessages = fetchedMessages.map((msg: any) => ({
-            ...msg,
-            is_me: checkIsMe(msg, currentUserId)
-        }));
-            
-        setMessages(formattedMessages);
+        // بعد التعديل في الباك إند، الداتا هترجع Array مباشر بدون results
+        const fetchedMessages = Array.isArray(response.data) ? response.data : [];
+        setMessages(fetchedMessages);
         
-        // 5. إشعار قراءة فوري عند فتح الغرفة
         await api.post(`chat/rooms/${roomId}/read/`).catch(() => {}); 
       } catch (error) {
         console.error("خطأ في جلب الرسائل:", error);
@@ -59,7 +36,6 @@ export const useChat = (roomId: string) => {
 
     fetchMessages();
 
-    // 6. جلب التوكن للبوشر
     let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
     if (!token && typeof document !== 'undefined') {
         const match = document.cookie.match(/(^| )token=([^;]+)/);
@@ -68,7 +44,6 @@ export const useChat = (roomId: string) => {
 
     if (!token) return;
 
-    // 7. تهيئة البوشر
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
       authEndpoint: `${API_URL}chat/pusher/auth/`,
@@ -77,20 +52,18 @@ export const useChat = (roomId: string) => {
 
     const channel = pusher.subscribe(`private-chat_${roomId}`);
 
-    // 8. استقبال الرسالة اللحظية
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // السحر هنا: بنحسب الاتجاه للرسالة اللحظية فوراً قبل ما تترسم
-          const actualIsMe = checkIsMe(newMsg, currentUserId);
+          // حساب الاتجاه للرسالة اللحظية فقط
+          const senderId = typeof newMsg.sender === 'object' ? String(newMsg.sender?.id) : String(newMsg.sender);
+          const actualIsMe = senderId === String(currentUserId);
           const correctedMsg = { ...newMsg, is_me: actualIsMe };
           
-          // منع تكرار الرسالة في الشاشة
           const exists = prev.find(m => String(m.id) === String(correctedMsg.id));
           if (exists) {
               return prev.map(m => String(m.id) === String(correctedMsg.id) ? correctedMsg : m);
           }
           
-          // لو الرسالة جاية من حد تاني وإحنا فاتحين الشات، نبعت Seen فوراً
           if (!actualIsMe) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
@@ -99,7 +72,6 @@ export const useChat = (roomId: string) => {
       });
     });
 
-    // 9. استقبال إشعار الـ Seen
     channel.bind('messages_read', () => {
       setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })));
     });
@@ -115,12 +87,9 @@ export const useChat = (roomId: string) => {
     };
   }, [roomId, currentUserId]); 
 
-  // 10. دالة إرسال الرسالة
   const sendMessage = async (content: string) => {
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
-      
-      // أنا لسه باعت الرسالة بايدي، إذن هي بتاعتي 100%
       const myMsg = { ...res.data, is_me: true };
       
       setMessages((prev) => {

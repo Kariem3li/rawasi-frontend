@@ -19,15 +19,17 @@ export default function ChatInput({ onSendMessage }: { onSendMessage: (text: str
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="اكتب رسالتك..."
-          className="flex-1 bg-gray-100 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+          // 🚀 تم تغيير لون النص لـ slate-800 ليكون مقروء جداً على الموبايل
+          className="flex-1 bg-gray-100 text-slate-800 font-medium rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-gray-400"
         />
         <button 
           type="submit" 
           disabled={!text.trim()}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-full w-12 h-12 flex justify-center items-center"
+          // 🚀 تم تغيير لون الزرار للذهبي بتاع الموقع (amber-500)
+          className="bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white rounded-full w-12 h-12 flex justify-center items-center transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         </button>
       </form>
