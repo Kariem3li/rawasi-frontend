@@ -9,21 +9,29 @@ export const useGlobalChat = () => {
     const { user, isAuthenticated } = useAuth();
     const [unreadCount, setUnreadCount] = useState(0);
 
+    // 🚀 1. جلب العداد: مفصول تماماً عشان يشتغل فوراً بمجرد اللوج إن (حتى لو البوشر متأخر)
+    useEffect(() => {
+        if (isAuthenticated) {
+            api.get('chat/unread-count/')
+               .then(res => setUnreadCount(res.data.unread_count))
+               .catch(err => console.error("Unread count error:", err));
+        }
+    }, [isAuthenticated]);
+
+    // 🚀 2. إعدادات البوشر (الرادار العام والصحين الرمادي)
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // 🚀 حماية مطلقة: نمنع البوشر إنه يشتغل لو الآي دي 0 أو undefined
+        // استخراج الآي دي الآمن
         let userId = String(user?.id);
         if (userId === '0' || userId === 'undefined' || userId === 'null' || !user?.id) {
             const stored = localStorage.getItem('user_id');
             if (stored && stored !== '0' && stored !== 'undefined' && stored !== 'null') {
                 userId = stored;
             } else {
-                return; // قفلة قوية عشان ميجيبش 403 Forbidden
+                return; // تأجيل التشغيل لحد ما الـ ID الحقيقي يظهر
             }
         }
-
-        api.get('chat/unread-count/').then(res => setUnreadCount(res.data.unread_count)).catch(()=>{});
 
         let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
         if (!token && typeof document !== 'undefined') {
@@ -32,15 +40,20 @@ export const useGlobalChat = () => {
         }
         if (!token) return;
 
+        Pusher.logToConsole = true;
+
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
           cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
           authEndpoint: `${API_URL}chat/pusher/auth/`,
           auth: { headers: { Authorization: `Token ${token}` } },
         });
 
-        const globalChannel = pusher.subscribe(`private-user_${userId}`);
+        const globalChannelName = `private-user_${userId}`;
+        const globalChannel = pusher.subscribe(globalChannelName);
 
         globalChannel.bind('new_message_notification', (data: any) => {
+            console.log("🚀 [GLOBAL CHAT] إشعار جديد وصل:", data);
+
             // أ) تحديث العداد
             api.get('chat/unread-count/').then(res => setUnreadCount(res.data.unread_count)).catch(()=>{});
             
@@ -51,16 +64,17 @@ export const useGlobalChat = () => {
             
             // ج) إرسال "تم الاستلام" عشان المرسل يشوف الصحين الرمادي
             if (data && data.id) {
-                api.post(`chat/messages/${data.id}/delivered/`).catch(() => {});
+                console.log("🚀 [GLOBAL CHAT] جاري تأكيد الاستلام...");
+                api.post(`chat/messages/${data.id}/delivered/`).catch((e) => console.log(e));
             }
         });
 
         return () => {
             globalChannel.unbind_all();
-            globalChannel.unsubscribe();
+            pusher.unsubscribe(globalChannelName);
             pusher.disconnect();
         };
-    }, [user?.id, isAuthenticated]);
+    }, [user, isAuthenticated]);
 
     return { unreadCount };
 };
