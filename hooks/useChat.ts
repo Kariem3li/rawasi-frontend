@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Pusher from 'pusher-js';
 import api from '@/lib/axios';
 import { API_URL } from '@/lib/config';
@@ -8,46 +8,44 @@ import { useAuth } from '@/providers/AuthProvider';
 export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth(); 
-  
-  // 🚀 1. استخدام useRef لحل مشكلة الـ Stale Closure (السبب الحقيقي في رمي الرسالة شمال لثانية)
-  const userIdRef = useRef<string | number | null>(null);
+  const { user } = useAuth();
+
+  // 🚀 1. مرجع ثابت لبيانات المستخدم عشان البوشر ميقراش داتا قديمة أبداً
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  // 🚀 2. دالة جلب الرسائل (هنثق في الباك إند 100%)
+  const fetchMessages = useCallback(async () => {
+    if (!roomId) return;
+    try {
+      setLoading(true);
+      const response = await api.get(`chat/rooms/${roomId}/messages/`, {
+          params: { _t: new Date().getTime() } 
+      });
+
+      const fetchedMessages = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.results || []);
+
+      // الباك إند (السيريلايزر) أصلاً بيبعت is_me صح، فمش هنلعب فيها تاني عشان متضربش شمال!
+      setMessages(fetchedMessages);
+
+      await api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
+    } catch (error) {
+      console.error("خطأ في جلب الرسائل:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [roomId]);
 
   useEffect(() => {
-    userIdRef.current = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
-  }, [user?.id]);
-
-  useEffect(() => {
-    // استخدمنا قيمة مبدئية فقط للتشغيل
-    const initialUserId = userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
-    if (!roomId || !initialUserId) return;
-
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get(`chat/rooms/${roomId}/messages/`, {
-            params: { _t: new Date().getTime() } 
-        });
-        
-        const fetchedMessages = Array.isArray(response.data) ? response.data : [];
-        
-        const formattedMessages = fetchedMessages.map((msg: any) => {
-            const senderId = typeof msg.sender === 'object' ? String(msg.sender?.id) : String(msg.sender);
-            // نقرأ الآي دي الحي من الـ Ref
-            const activeId = userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
-            return { ...msg, is_me: senderId === String(activeId) };
-        });
-            
-        setMessages(formattedMessages);
-        await api.post(`chat/rooms/${roomId}/read/`).catch(() => {}); 
-      } catch (error) {
-        console.error("خطأ في جلب الرسائل:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMessages();
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    if (!roomId) return;
 
     let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
     if (!token && typeof document !== 'undefined') {
@@ -67,23 +65,23 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // 🚀 2. السحب الحي للـ ID جوه الدالة وقت وصول الرسالة عشان نستحيل نغلط
-          const activeId = userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
-          
-          const senderId = typeof newMsg.sender === 'object' ? String(newMsg.sender?.id) : String(newMsg.sender);
-          const actualIsMe = activeId ? (senderId === String(activeId)) : false;
-          
-          const correctedMsg = { ...newMsg, is_me: actualIsMe };
-          
-          const exists = prev.find(m => String(m.id) === String(correctedMsg.id));
-          if (exists) {
-              return prev.map(m => String(m.id) === String(correctedMsg.id) ? correctedMsg : m);
+          // لو الرسالة دي موجودة أصلاً (عشان أنا لسه باعتها من ثانية) مش هنضيفها تاني
+          if (prev.some(m => String(m.id) === String(newMsg.id))) {
+              return prev;
           }
+
+          // تحديد الاتجاه للرسايل اللحظية بس
+          const currentUserId = userRef.current?.id || localStorage.getItem('user_id');
+          const senderId = typeof newMsg.sender === 'object' ? String(newMsg.sender?.id) : String(newMsg.sender);
           
-          if (!actualIsMe) {
+          const isMine = currentUserId ? (senderId === String(currentUserId)) : false;
+          const correctedMsg = { ...newMsg, is_me: isMine };
+
+          // لو رسالة الطرف التاني نبعت Seen
+          if (!isMine) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
-          
+
           return [...prev, correctedMsg];
       });
     });
@@ -101,34 +99,24 @@ export const useChat = (roomId: string) => {
             console.error("Pusher cleanup error:", e);
         }
     };
-  }, [roomId]); // شيلنا اليوزر آي دي من هنا عشان الشات ميعملش ريستارت ويفقد الاتصال
+  }, [roomId]);
 
   const sendMessage = async (content: string) => {
-    // 🚀 3. Optimistic Update (إظهار الرسالة يمين فوراً بمجرد الضغط بدون انتظار أي سيرفر)
-    const tempId = `temp_${Date.now()}`;
-    const optimisticMsg = {
-        id: tempId,
-        content: content,
-        created_at: new Date().toISOString(),
-        is_read: false,
-        is_delivered: false,
-        is_me: true, // يمين إجباري
-    };
-
-    setMessages((prev) => [...prev, optimisticMsg]);
-
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
+
+      // الرسالة دي मेरी 100%
       const realMsg = { ...res.data, is_me: true };
-      
+
       setMessages((prev) => {
-          // تبديل الرسالة الوهمية بالرسالة الحقيقية اللي راجعة من السيرفر بسلاسة
-          const filtered = prev.filter(m => m.id !== tempId && String(m.id) !== String(realMsg.id));
-          return [...filtered, realMsg];
+          // منع أي تكرار وتأكيد الاتجاه الصحيح
+          const exists = prev.some(m => String(m.id) === String(realMsg.id));
+          if (exists) {
+              return prev.map(m => String(m.id) === String(realMsg.id) ? realMsg : m);
+          }
+          return [...prev, realMsg];
       });
     } catch (error: any) {
-      // لو النت فصل مثلاً، بنمسح الرسالة الوهمية اللي كتبناها
-      setMessages((prev) => prev.filter(m => m.id !== tempId));
       if (error.response?.data?.content) alert(error.response.data.content[0]);
     }
   };
