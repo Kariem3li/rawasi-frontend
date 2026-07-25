@@ -92,6 +92,7 @@ export const useChat = (roomId: string) => {
 
     // 🚀 استقبال الصحين الرمادي
     channel.bind('message_delivered', (data: any) => {
+      console.log("🔥 DEBUG FRONTEND: Received Double Tick event from Pusher!", data);
       setMessages((prev) => prev.map((msg) => 
         String(msg.id) === String(data.message_id) ? { ...msg, is_delivered: true } : msg
       ));

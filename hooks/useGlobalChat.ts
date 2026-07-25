@@ -9,13 +9,18 @@ export const useGlobalChat = () => {
     const { user, isAuthenticated } = useAuth();
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // جلب العداد الأساسي عند تحميل الصفحة
+    const fetchUnreadCount = () => {
+        // 🚀 إضافة _t عشان نمنع المتصفح من كاش العداد القديم
+        api.get(`chat/unread-count/?_t=${new Date().getTime()}`)
+           .then(res => {
+               console.log("🔥 DEBUG FRONTEND: Unread Count API returned ->", res.data.unread_count);
+               setUnreadCount(res.data.unread_count);
+           })
+           .catch(err => console.error("Unread count error:", err));
+    };
+
     useEffect(() => {
-        if (isAuthenticated) {
-            api.get('chat/unread-count/')
-               .then(res => setUnreadCount(res.data.unread_count))
-               .catch(err => console.error("Unread count error:", err));
-        }
+        if (isAuthenticated) fetchUnreadCount();
     }, [isAuthenticated]);
 
     useEffect(() => {
@@ -44,16 +49,19 @@ export const useGlobalChat = () => {
         const globalChannel = pusher.subscribe(globalChannelName);
 
         globalChannel.bind('new_message_notification', (data: any) => {
-            // 🚀 السحر: زيادة العداد فوراً (لايف) بدون انتظار السيرفر
-            setUnreadCount(prev => prev + 1);
+            console.log("🔥 DEBUG FRONTEND: Global Channel received notification!", data);
+            
+            setUnreadCount(prev => prev + 1); // لايف أبديت
             
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new Event('chat_rooms_updated'));
             }
             
-            // 🚀 إرسال الاستلام عشان المرسل يشوف الصحين الرمادي
             if (data && data.id) {
-                api.post(`chat/messages/${data.id}/delivered/`).catch(() => {});
+                console.log(`🔥 DEBUG FRONTEND: Sending delivered status for msg ${data.id}`);
+                api.post(`chat/messages/${data.id}/delivered/`)
+                   .then(() => console.log("🔥 DEBUG FRONTEND: Delivered API success!"))
+                   .catch((e) => console.log("🔥 DEBUG FRONTEND: Delivered API failed!", e));
             }
         });
 
