@@ -6,10 +6,14 @@ import { API_URL } from '@/lib/config';
 import { useAuth } from '@/providers/AuthProvider';
 
 export const useGlobalChat = () => {
-    const { user } = useAuth();
+    // 🚀 جلب حالة تسجيل الدخول للتأمين
+    const { user, isAuthenticated } = useAuth();
     const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
+        // لا تشغل المراقبة إلا لو مسجل دخول
+        if (!isAuthenticated) return;
+
         let userId = user?.id;
         if (!userId && typeof window !== 'undefined') {
             const stored = localStorage.getItem('user_id');
@@ -30,16 +34,20 @@ export const useGlobalChat = () => {
         }
         if (!token) return;
 
+        // 🚀 تشغيل لوج الكونسول لكشف الأخطاء أو الاستلام
+        Pusher.logToConsole = true;
+
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
           cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
           authEndpoint: `${API_URL}chat/pusher/auth/`,
           auth: { headers: { Authorization: `Token ${token}` } },
         });
 
-        // 🚀 التصنت العام على إشعارات اليوزر في كل صفحات الموقع
         const globalChannel = pusher.subscribe(`private-user_${userId}`);
 
         globalChannel.bind('new_message_notification', (data: any) => {
+            console.log("🚀 [GLOBAL CHAT] إشعار رسالة جديدة وصل:", data);
+
             // أ) تحديث عداد الـ Navbar فوراً
             api.get('chat/unread-count/').then(res => setUnreadCount(res.data.unread_count)).catch(()=>{});
             
@@ -50,7 +58,8 @@ export const useGlobalChat = () => {
             
             // ج) السحر: إرسال "تم الاستلام" للسيرفر عشان الطرف الأول يشوف صحين رمادي
             if (data && data.id) {
-                api.post(`chat/messages/${data.id}/delivered/`).catch(() => {});
+                console.log("🚀 [GLOBAL CHAT] إرسال تأكيد استلام...");
+                api.post(`chat/messages/${data.id}/delivered/`).catch((e) => console.log("Delivered API Error:", e));
             }
         });
 
@@ -59,7 +68,7 @@ export const useGlobalChat = () => {
             globalChannel.unsubscribe();
             pusher.disconnect();
         };
-    }, [user?.id]);
+    }, [user?.id, isAuthenticated]); // ربط التحديث بحالة تسجيل الدخول
 
     return { unreadCount };
 };
