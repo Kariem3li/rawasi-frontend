@@ -10,13 +10,14 @@ export const useChat = (roomId: string) => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // 🚀 1. مرجع ثابت لبيانات المستخدم عشان البوشر ميقراش داتا قديمة أبداً
   const userRef = useRef(user);
+  // 🚀 السحر الجديد: مرجع هيتعلم الـ ID بتاعك من الداتابيز عشان البوشر ميغلطش أبداً
+  const learnedMyIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     userRef.current = user;
   }, [user]);
 
-  // 🚀 2. دالة جلب الرسائل (هنثق في الباك إند 100%)
   const fetchMessages = useCallback(async () => {
     if (!roomId) return;
     try {
@@ -29,9 +30,14 @@ export const useChat = (roomId: string) => {
         ? response.data
         : (response.data?.results || []);
 
-      // الباك إند (السيريلايزر) أصلاً بيبعت is_me صح، فمش هنلعب فيها تاني عشان متضربش شمال!
-      setMessages(fetchedMessages);
+      // 🚀 الذكاء الاصطناعي: هندور على أي رسالة الباك إند قال إنها بتاعتك (is_me: true) وناخد منها الـ ID بتاعك كضمان!
+      const myMsg = fetchedMessages.find((m: any) => m.is_me === true);
+      if (myMsg) {
+          const senderVal = myMsg.sender?.id || myMsg.sender;
+          if (senderVal) learnedMyIdRef.current = String(senderVal);
+      }
 
+      setMessages(fetchedMessages);
       await api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
     } catch (error) {
       console.error("خطأ في جلب الرسائل:", error);
@@ -65,19 +71,19 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // لو الرسالة دي موجودة أصلاً (عشان أنا لسه باعتها من ثانية) مش هنضيفها تاني
+          // لو الرسالة موجودة فعلاً (أو موجودة كنسخة وهمية مؤقتة) هنتجاهلها عشان منع الرعشة
           if (prev.some(m => String(m.id) === String(newMsg.id))) {
               return prev;
           }
 
-          // تحديد الاتجاه للرسايل اللحظية بس
-          const currentUserId = userRef.current?.id || localStorage.getItem('user_id');
+          // نحدد الآي دي بتاعك بأدق طريقة ممكنة (من المرجع المُتعلم، أو اليوزر، أو اللوكال ستوريدج)
+          const currentUserId = learnedMyIdRef.current || String(userRef.current?.id) || localStorage.getItem('user_id');
           const senderId = typeof newMsg.sender === 'object' ? String(newMsg.sender?.id) : String(newMsg.sender);
           
           const isMine = currentUserId ? (senderId === String(currentUserId)) : false;
           const correctedMsg = { ...newMsg, is_me: isMine };
 
-          // لو رسالة الطرف التاني نبعت Seen
+          // إشعار قراءة للطرف التاني
           if (!isMine) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
@@ -102,21 +108,31 @@ export const useChat = (roomId: string) => {
   }, [roomId]);
 
   const sendMessage = async (content: string) => {
+    // 🚀 التحديث المتفائل: نرسم الرسالة يمين فوووراً وقت الضغط عشان نحسس العميل بسرعة البرق
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMsg = {
+        id: tempId,
+        content: content,
+        created_at: new Date().toISOString(),
+        is_read: false,
+        is_delivered: false,
+        is_me: true, // إجباري يمين
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
-
-      // الرسالة دي मेरी 100%
       const realMsg = { ...res.data, is_me: true };
 
       setMessages((prev) => {
-          // منع أي تكرار وتأكيد الاتجاه الصحيح
-          const exists = prev.some(m => String(m.id) === String(realMsg.id));
-          if (exists) {
-              return prev.map(m => String(m.id) === String(realMsg.id) ? realMsg : m);
-          }
-          return [...prev, realMsg];
+          // بنشيل النسخة الوهمية ونحط النسخة الحقيقية اللي رجعت من السيرفر بدون أي رعشة
+          const filtered = prev.filter(m => m.id !== tempId && String(m.id) !== String(realMsg.id));
+          return [...filtered, realMsg];
       });
     } catch (error: any) {
+      // لو النت فصل، بنمسح الرسالة الوهمية
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
       if (error.response?.data?.content) alert(error.response.data.content[0]);
     }
   };
