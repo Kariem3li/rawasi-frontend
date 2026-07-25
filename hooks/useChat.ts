@@ -27,9 +27,7 @@ export const useChat = (roomId: string) => {
           params: { _t: new Date().getTime() } 
       });
 
-      const fetchedMessages = Array.isArray(response.data)
-        ? response.data
-        : (response.data?.results || []);
+      const fetchedMessages = Array.isArray(response.data) ? response.data : (response.data?.results || []);
 
       const myMsg = fetchedMessages.find((m: any) => m.is_me === true);
       if (myMsg) {
@@ -92,12 +90,14 @@ export const useChat = (roomId: string) => {
       });
     });
 
+    // 🚀 استقبال الصحين الرمادي
     channel.bind('message_delivered', (data: any) => {
       setMessages((prev) => prev.map((msg) => 
         String(msg.id) === String(data.message_id) ? { ...msg, is_delivered: true } : msg
       ));
     });
 
+    // 🚀 استقبال الصحين الملونين
     channel.bind('messages_read', () => {
       setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })));
     });
@@ -107,9 +107,7 @@ export const useChat = (roomId: string) => {
             channel.unbind_all();
             channel.unsubscribe();
             pusher.disconnect();
-        } catch (e) {
-            console.error("Pusher cleanup error:", e);
-        }
+        } catch (e) {}
     };
   }, [roomId]);
 
@@ -121,7 +119,6 @@ export const useChat = (roomId: string) => {
       setMessages((prev) => {
           const existingMsg = prev.find(m => String(m.id) === String(realMsg.id));
           if (existingMsg) {
-              // 🚀 السر كله هنا: نحافظ على حالة الصحين الرمادي اللي البوشر جابها قبل ما الـ API يرد!
               return prev.map(m => String(m.id) === String(realMsg.id) ? 
                   { ...realMsg, is_delivered: m.is_delivered || realMsg.is_delivered, is_read: m.is_read || realMsg.is_read } : m);
           }
