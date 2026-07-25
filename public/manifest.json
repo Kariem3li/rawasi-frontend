@@ -1,21 +1,21 @@
 {
-  "name": "ٌRawasi Real State",
-  "short_name": "ٌRawasi",
+  "name": "Rawasi Real Estate",
+  "short_name": "Rawasi",
   "description": "منصتك الأولى للبحث عن أفضل العقارات",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#f59e0b",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/Gemini_Generated_Image_ykgajuykgajuykga.png",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "/icons/Gemini_Generated_Image_ykgajuykgajuykga.png",
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"

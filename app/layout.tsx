@@ -1,27 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Cairo } from "next/font/google"; // استخدام خط عربي محترم ومقروء
+import { Cairo } from "next/font/google"; 
 import "./globals.css";
 
-// 🚀 الاستدعاءات
 import { AuthProvider } from "@/providers/AuthProvider"; 
-import { VideoUploadProvider } from "@/components/VideoUploadContext"; // المزود بتاع الفيديو
-import Navbar from "@/components/Navbar"; // النافبار بتاعنا
+import { VideoUploadProvider } from "@/components/VideoUploadContext"; 
+import Navbar from "@/components/Navbar"; 
 
-// تحميل الخط
 const cairo = Cairo({ 
   subsets: ["arabic"], 
   variable: "--font-cairo" 
 });
 
-// 🚀 ألوان الموبايل المتصفح
 export const viewport: Viewport = {
-  themeColor: "#f59e0b", // لون موقعك (Amber)
+  themeColor: "#f59e0b", 
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
 
-// 🚀 الـ SEO المظبوط لجوجل والسوشيال ميديا
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://rawasi-project-v5-production.up.railway.app"),
   title: { 
@@ -29,6 +25,7 @@ export const metadata: Metadata = {
     template: "%s | رواسي للعقارات" 
   },
   description: "منصة رواسي لشراء وبيع وإيجار العقارات في مدينة العاشر من رمضان ومصر. اكتشف شقق، فيلات، وأراضي بأفضل الأسعار.",
+  manifest: "/manifest.json", // 🚀 السطر السحري اللي بيشغل التثبيت بالأيقونة بتاعتك
   openGraph: {
     type: "website", 
     locale: "ar_EG",
@@ -46,14 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ar" dir="rtl">
       <body className={`${cairo.variable} font-sans bg-slate-50 text-slate-900`}>
         <AuthProvider>
-          {/* 🚀 غلفنا الموقع كله بمزود الفيديو */}
           <VideoUploadProvider>
-            
-            {/* 🚀 النافبار ثابت هنا عشان يظهر في كل الصفحات وفيه مؤشر الرفع */}
             <Navbar />
-            
             {children}
-            
           </VideoUploadProvider>
         </AuthProvider>
       </body>
