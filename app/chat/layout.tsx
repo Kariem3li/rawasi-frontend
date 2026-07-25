@@ -1,35 +1,74 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import api from '@/lib/axios';
 import { usePathname } from 'next/navigation';
-import { MessageCircle } from 'lucide-react'; // أيقونة إضافية للزينة
+import { MessageCircle } from 'lucide-react';
+import Pusher from 'pusher-js';
+import { API_URL } from '@/lib/config';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const [rooms, setRooms] = useState<any[]>([]);
   const pathname = usePathname();
   const isRootChat = pathname === '/chat' || pathname === '/chat/';
+  const { user } = useAuth(); // 🚀 جلب المستخدم
+
+  // 🚀 فصلنا جلب الغرف في دالة عشان نعرف نناديها من جوه البوشر
+  const fetchRooms = useCallback(async () => {
+    try {
+      const response = await api.get('chat/rooms/');
+      const fetchedRooms = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || []);
+        
+      setRooms(fetchedRooms.filter((room: any) => room.last_message !== null));
+    } catch (error) {
+      console.error("خطأ في جلب الغرف:", error);
+      setRooms([]);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const response = await api.get('chat/rooms/');
-        console.log("الرد الكامل من السيرفر:", response);
-        console.log("الداتا اللي راجعة:", response.data);
-        // 🚀 السحر هنا: لو الداتا جاية في Object بسبب الـ Pagination بناخد الـ results
-        const fetchedRooms = Array.isArray(response.data) 
-          ? response.data 
-          : (response.data?.results || []);
-          
-        // 🚀 الفلتر ده هيخفي أي غرفة مفيهاش رسايل تماماً
-        setRooms(fetchedRooms.filter((room: any) => room.last_message !== null));
-      } catch (error) {
-        console.error("خطأ في جلب الغرف:", error);
-        setRooms([]);
-      }
-    };
     fetchRooms();
-  }, [pathname]); // 🚀 ضفنا pathname عشان لو اتنقل بين الغرف اللستة تتحدث
+  }, [fetchRooms, pathname]);
+
+  // 🚀 البوشر اللي بيتصنت على إشعاراتك وإنت فاتح أي صفحة في الشات
+  useEffect(() => {
+    const currentUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
+    if (!currentUserId) return;
+
+    let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+    if (!token && typeof document !== 'undefined') {
+        const match = document.cookie.match(/(^| )token=([^;]+)/);
+        if (match) token = match[2];
+    }
+    if (!token) return;
+
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
+      authEndpoint: `${API_URL}chat/pusher/auth/`,
+      auth: { headers: { Authorization: `Token ${token}` } },
+    });
+
+    const globalChannel = pusher.subscribe(`private-user_${currentUserId}`);
+
+    globalChannel.bind('new_message_notification', (data: any) => {
+      // 1. حدث اللستة عشان النقطة الحمرا تنور
+      fetchRooms();
+
+      // 2. قول للباك إند "أنا استلمت الرسالة" عشان يعمل للمرسل صحين رمادي
+      if (data && data.id) {
+          api.post(`chat/messages/${data.id}/delivered/`).catch((e) => console.log(e));
+      }
+    });
+
+    return () => {
+        globalChannel.unbind_all();
+        globalChannel.unsubscribe();
+        pusher.disconnect();
+    };
+  }, [user?.id, fetchRooms]);
 
   return (
     <div className="flex h-[calc(100vh-75px)] mt-[75px] bg-white overflow-hidden" dir="rtl">
@@ -66,7 +105,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                             {room.last_message?.content || "لا توجد رسائل"}
                         </p>
                         
-                        {/* 🚀 إظهار النقطة الحمرا لو الغرفة فيها رسايل جديدة */}
+                        {/* النقطة الحمرا */}
                         {room.unread_count > 0 && (
                             <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shrink-0">
                                 {room.unread_count}
