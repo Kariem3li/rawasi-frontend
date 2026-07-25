@@ -9,6 +9,16 @@ export const useChat = (roomId: string) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth(); 
+  
+  // 🚀 استخراج دقيق للـ ID الخاص بالمستخدم الحالي من كل الأماكن الممكنة
+  const currentUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
+
+  // 🚀 دالة سحرية وظيفتها الوحيدة تحديد: دي رسالتي (يمين) ولا لأ (شمال)
+  const checkIsMe = (senderId: any, backendIsMe: boolean) => {
+     if (!senderId && backendIsMe !== undefined) return backendIsMe;
+     const normalizedSenderId = senderId?.id ? String(senderId.id) : String(senderId);
+     return normalizedSenderId === String(currentUserId);
+  };
 
   useEffect(() => {
     if (!roomId) return;
@@ -17,7 +27,7 @@ export const useChat = (roomId: string) => {
       try {
         setLoading(true);
         
-        // 🚀 كسر الـ Cache الإجباري للمتصفح وجلب أحدث رسائل
+        // كسر الكاش عشان مفيش رسالة تتمسح بعد الريفريش
         const response = await api.get(`chat/rooms/${roomId}/messages/`, {
             params: { _t: new Date().getTime() } 
         });
@@ -26,7 +36,13 @@ export const useChat = (roomId: string) => {
             ? response.data 
             : (response.data?.results || []);
             
-        setMessages(fetchedMessages);
+        // 🚀 فرض السيطرة على اليمين والشمال بناءً على الـ ID مش كلام الباك إند
+        const formattedMessages = fetchedMessages.map((msg: any) => ({
+            ...msg,
+            is_me: checkIsMe(msg.sender, msg.is_me)
+        }));
+            
+        setMessages(formattedMessages);
         
         // إشعار قراءة للرسائل
         await api.post(`chat/rooms/${roomId}/read/`).catch(() => {}); 
@@ -57,28 +73,28 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          let actualIsMe = String(newMsg.sender) === String(user?.id);
-          
-          if (!actualIsMe && Array.isArray(prev)) {
-              const pastMsg = prev.find(m => m.is_me === true);
-              if (pastMsg && String(newMsg.sender) === String(pastMsg.sender)) {
-                  actualIsMe = true;
-              }
-          }
-
+          // حساب دقيق للرسالة الجاية من بوشر (يمين ولا شمال)
+          const actualIsMe = checkIsMe(newMsg.sender, newMsg.is_me);
           const correctedMsg = { ...newMsg, is_me: actualIsMe };
-          const filtered = Array.isArray(prev) ? prev.filter(m => m.id !== correctedMsg.id) : [];
           
+          // التأكد إنها مش متكررة
+          const exists = prev.find(m => String(m.id) === String(correctedMsg.id));
+          if (exists) {
+              return prev.map(m => String(m.id) === String(correctedMsg.id) ? correctedMsg : m);
+          }
+          
+          // لو الرسالة جاية من الطرف التاني، نبلغ السيرفر إننا قرأناها فوراً
           if (!actualIsMe) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
           
-          return [...filtered, correctedMsg];
+          return [...prev, correctedMsg];
       });
     });
 
     channel.bind('messages_read', () => {
-      setMessages((prev) => Array.isArray(prev) ? prev.map((msg) => ({ ...msg, is_read: true })) : []);
+      // تلوين كل الرسايل اللي في الشاشة لـ أزرق
+      setMessages((prev) => prev.map((msg) => ({ ...msg, is_read: true })));
     });
 
     return () => {
@@ -90,16 +106,17 @@ export const useChat = (roomId: string) => {
             console.error("Pusher cleanup error:", e);
         }
     };
-  }, [roomId, user?.id]);
+  }, [roomId, currentUserId]);
 
   const sendMessage = async (content: string) => {
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
       
+      // 🚀 فرض سيطرة: الرسالة اللي أنا لسه دايس إرسال عليها بتاعتي 100%
       const myMsg = { ...res.data, is_me: true };
       
       setMessages((prev) => {
-          const filtered = Array.isArray(prev) ? prev.filter(m => m.id !== myMsg.id) : [];
+          const filtered = prev.filter(m => String(m.id) !== String(myMsg.id));
           return [...filtered, myMsg];
       });
       
