@@ -14,7 +14,6 @@ export const useChat = (roomId: string) => {
   const learnedMyIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // 🚀 تأمين الآي دي هنا كمان
     if (user && String(user.id) !== '0') {
         userRef.current = user;
     }
@@ -59,7 +58,6 @@ export const useChat = (roomId: string) => {
         const match = document.cookie.match(/(^| )token=([^;]+)/);
         if (match) token = match[2];
     }
-
     if (!token) return;
 
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
@@ -94,7 +92,6 @@ export const useChat = (roomId: string) => {
       });
     });
 
-    // 🚀🚀 السر هنا! استقبال إشعار الصحين الرمادي (كان ممسوح من عندك)
     channel.bind('message_delivered', (data: any) => {
       setMessages((prev) => prev.map((msg) => 
         String(msg.id) === String(data.message_id) ? { ...msg, is_delivered: true } : msg
@@ -122,9 +119,11 @@ export const useChat = (roomId: string) => {
       const realMsg = { ...res.data, is_me: true };
 
       setMessages((prev) => {
-          const exists = prev.some(m => String(m.id) === String(realMsg.id));
-          if (exists) {
-              return prev.map(m => String(m.id) === String(realMsg.id) ? realMsg : m);
+          const existingMsg = prev.find(m => String(m.id) === String(realMsg.id));
+          if (existingMsg) {
+              // 🚀 السر كله هنا: نحافظ على حالة الصحين الرمادي اللي البوشر جابها قبل ما الـ API يرد!
+              return prev.map(m => String(m.id) === String(realMsg.id) ? 
+                  { ...realMsg, is_delivered: m.is_delivered || realMsg.is_delivered, is_read: m.is_read || realMsg.is_read } : m);
           }
           return [...prev, realMsg];
       });

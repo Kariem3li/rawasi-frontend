@@ -9,7 +9,7 @@ export const useGlobalChat = () => {
     const { user, isAuthenticated } = useAuth();
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // 🚀 1. جلب العداد: مفصول تماماً عشان يشتغل فوراً بمجرد اللوج إن (حتى لو البوشر متأخر)
+    // 🚀 1. جلب العداد المبدئي (مستقل تماماً)
     useEffect(() => {
         if (isAuthenticated) {
             api.get('chat/unread-count/')
@@ -22,16 +22,8 @@ export const useGlobalChat = () => {
     useEffect(() => {
         if (!isAuthenticated) return;
 
-        // استخراج الآي دي الآمن
-        let userId = String(user?.id);
-        if (userId === '0' || userId === 'undefined' || userId === 'null' || !user?.id) {
-            const stored = localStorage.getItem('user_id');
-            if (stored && stored !== '0' && stored !== 'undefined' && stored !== 'null') {
-                userId = stored;
-            } else {
-                return; // تأجيل التشغيل لحد ما الـ ID الحقيقي يظهر
-            }
-        }
+        const userId = String(user?.id || localStorage.getItem('user_id'));
+        if (!userId || userId === '0' || userId === 'undefined' || userId === 'null') return;
 
         let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
         if (!token && typeof document !== 'undefined') {
@@ -40,7 +32,7 @@ export const useGlobalChat = () => {
         }
         if (!token) return;
 
-        Pusher.logToConsole = true;
+        // Pusher.logToConsole = true; // شيلنا اللوج عشان الكونسول يبقى نظيف
 
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
           cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
@@ -52,20 +44,15 @@ export const useGlobalChat = () => {
         const globalChannel = pusher.subscribe(globalChannelName);
 
         globalChannel.bind('new_message_notification', (data: any) => {
-            console.log("🚀 [GLOBAL CHAT] إشعار جديد وصل:", data);
-
-            // أ) تحديث العداد
-            api.get('chat/unread-count/').then(res => setUnreadCount(res.data.unread_count)).catch(()=>{});
+            // 🚀 السحر هنا: زيادة العداد فوراً في الواجهة بدون انتظار السيرفر (طلقة!)
+            setUnreadCount(prev => prev + 1);
             
-            // ب) تحديث قائمة الشات
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new Event('chat_rooms_updated'));
             }
             
-            // ج) إرسال "تم الاستلام" عشان المرسل يشوف الصحين الرمادي
             if (data && data.id) {
-                console.log("🚀 [GLOBAL CHAT] جاري تأكيد الاستلام...");
-                api.post(`chat/messages/${data.id}/delivered/`).catch((e) => console.log(e));
+                api.post(`chat/messages/${data.id}/delivered/`).catch(() => {});
             }
         });
 
@@ -74,7 +61,7 @@ export const useGlobalChat = () => {
             pusher.unsubscribe(globalChannelName);
             pusher.disconnect();
         };
-    }, [user, isAuthenticated]);
+    }, [user?.id, isAuthenticated]); // 🚀 استخدام user?.id بيمنع إعادة الاتصال العشوائية
 
     return { unreadCount };
 };
