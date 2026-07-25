@@ -12,24 +12,21 @@ export const useChat = (roomId: string) => {
   
   const currentUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
 
-  // 🚀 دالة صارمة جداً مستحيل تغلط وتودي الرسايل يمين عمال على بطال
+  // 🚀 الحكم القاطع: الاعتماد كلياً على الـ ID وعدم الثقة في is_me القادمة عبر Pusher
   const checkIsMe = (msg: any) => {
-     // 1. لو الباك إند باعت is_me بشكل صريح
-     if (typeof msg.is_me === 'boolean') return msg.is_me;
-     
-     // 2. لو الـ ID بتاع اليوزر مش موجود أو undefined، مستحيل نعتبر الرسالة بتاعته (عشان متروحش يمين)
+     // 1. التأكد إن الآي دي بتاع المستخدم الحالي موجود
      if (!currentUserId || String(currentUserId) === 'undefined' || String(currentUserId) === 'null') {
          return false;
      }
      
-     // 3. لو الباك إند مش باعت الـ sender أصلاً في الرسالة
+     // 2. استخراج المرسل من الرسالة (الباك إند بيبعته كـ Object أو رقم)
      const sender = msg.sender;
-     if (!sender || String(sender) === 'undefined' || String(sender) === 'null') {
-         return false;
+     if (!sender) {
+         return msg.is_me === true; // حالة احتياطية نادرة جداً
      }
 
-     // 4. المقارنة السليمة 100%
-     const senderId = sender?.id ? String(sender.id) : String(sender);
+     // 3. المقارنة الحاسمة اللي مستحيل تغلط
+     const senderId = typeof sender === 'object' ? String(sender.id) : String(sender);
      return senderId === String(currentUserId);
   };
 
@@ -48,7 +45,6 @@ export const useChat = (roomId: string) => {
             ? response.data 
             : (response.data?.results || []);
             
-        // 🚀 استخدام الدالة الصارمة
         const formattedMessages = fetchedMessages.map((msg: any) => ({
             ...msg,
             is_me: checkIsMe(msg)
@@ -84,14 +80,17 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
+          // حساب الاتجاه الصحيح فوراً عند الاستقبال
           const actualIsMe = checkIsMe(newMsg);
           const correctedMsg = { ...newMsg, is_me: actualIsMe };
           
+          // منع التكرار
           const exists = prev.find(m => String(m.id) === String(correctedMsg.id));
           if (exists) {
               return prev.map(m => String(m.id) === String(correctedMsg.id) ? correctedMsg : m);
           }
           
+          // 🚀 السحر: لو الرسالة مش بتاعتي فعلاً، هبعت إشعار مقروء للطرف الآخر
           if (!actualIsMe) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
