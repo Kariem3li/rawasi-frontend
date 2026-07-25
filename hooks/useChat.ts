@@ -14,7 +14,10 @@ export const useChat = (roomId: string) => {
   const learnedMyIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    userRef.current = user;
+    // 🚀 تأمين الآي دي هنا كمان
+    if (user && String(user.id) !== '0') {
+        userRef.current = user;
+    }
   }, [user]);
 
   const fetchMessages = useCallback(async () => {
@@ -29,7 +32,6 @@ export const useChat = (roomId: string) => {
         ? response.data
         : (response.data?.results || []);
 
-      // تأمين الـ ID عشان البوشر ميغلطش أبداً
       const myMsg = fetchedMessages.find((m: any) => m.is_me === true);
       if (myMsg) {
           const senderVal = myMsg.sender?.id || myMsg.sender;
@@ -70,15 +72,18 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // لو الرسالة دي موجودة مش هنضيفها تاني (منع التكرار نهائياً)
           if (prev.some(m => String(m.id) === String(newMsg.id))) {
               return prev.map(m => String(m.id) === String(newMsg.id) ? { ...newMsg, is_me: m.is_me } : m);
           }
 
-          const currentUserId = learnedMyIdRef.current || String(userRef.current?.id) || localStorage.getItem('user_id');
+          let currentUserId = learnedMyIdRef.current || String(userRef.current?.id);
+          if (!currentUserId || currentUserId === '0' || currentUserId === 'undefined') {
+              currentUserId = String(localStorage.getItem('user_id'));
+          }
+
           const senderId = typeof newMsg.sender === 'object' ? String(newMsg.sender?.id) : String(newMsg.sender);
           
-          const isMine = currentUserId ? (senderId === String(currentUserId)) : false;
+          const isMine = (currentUserId && currentUserId !== '0') ? (senderId === currentUserId) : false;
           const correctedMsg = { ...newMsg, is_me: isMine };
 
           if (!isMine) {
@@ -87,6 +92,13 @@ export const useChat = (roomId: string) => {
 
           return [...prev, correctedMsg];
       });
+    });
+
+    // 🚀🚀 السر هنا! استقبال إشعار الصحين الرمادي (كان ممسوح من عندك)
+    channel.bind('message_delivered', (data: any) => {
+      setMessages((prev) => prev.map((msg) => 
+        String(msg.id) === String(data.message_id) ? { ...msg, is_delivered: true } : msg
+      ));
     });
 
     channel.bind('messages_read', () => {
@@ -110,7 +122,6 @@ export const useChat = (roomId: string) => {
       const realMsg = { ...res.data, is_me: true };
 
       setMessages((prev) => {
-          // لو البوشر كان أسرع ونزل الرسالة، هنحدثها بس، ولو لسه منزلتش، هنضيفها إحنا
           const exists = prev.some(m => String(m.id) === String(realMsg.id));
           if (exists) {
               return prev.map(m => String(m.id) === String(realMsg.id) ? realMsg : m);

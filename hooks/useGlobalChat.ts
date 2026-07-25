@@ -6,25 +6,23 @@ import { API_URL } from '@/lib/config';
 import { useAuth } from '@/providers/AuthProvider';
 
 export const useGlobalChat = () => {
-    // 🚀 جلب حالة تسجيل الدخول للتأمين
     const { user, isAuthenticated } = useAuth();
     const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
-        // لا تشغل المراقبة إلا لو مسجل دخول
         if (!isAuthenticated) return;
 
-        let userId = user?.id;
-        if (!userId && typeof window !== 'undefined') {
+        // 🚀 حماية مطلقة: نمنع البوشر إنه يشتغل لو الآي دي 0 أو undefined
+        let userId = String(user?.id);
+        if (userId === '0' || userId === 'undefined' || userId === 'null' || !user?.id) {
             const stored = localStorage.getItem('user_id');
-            if (stored && stored !== 'undefined' && stored !== 'null') {
+            if (stored && stored !== '0' && stored !== 'undefined' && stored !== 'null') {
                 userId = stored;
+            } else {
+                return; // قفلة قوية عشان ميجيبش 403 Forbidden
             }
         }
 
-        if (!userId) return;
-
-        // 1. جلب عدد الرسائل الكلي أول ما الموقع يفتح
         api.get('chat/unread-count/').then(res => setUnreadCount(res.data.unread_count)).catch(()=>{});
 
         let token = localStorage.getItem('token') || sessionStorage.getItem('token') || '';
@@ -33,9 +31,6 @@ export const useGlobalChat = () => {
             if (match) token = match[2];
         }
         if (!token) return;
-
-        // 🚀 تشغيل لوج الكونسول لكشف الأخطاء أو الاستلام
-        Pusher.logToConsole = true;
 
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY || 'd558a2e3ed306c081a46', {
           cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
@@ -46,20 +41,17 @@ export const useGlobalChat = () => {
         const globalChannel = pusher.subscribe(`private-user_${userId}`);
 
         globalChannel.bind('new_message_notification', (data: any) => {
-            console.log("🚀 [GLOBAL CHAT] إشعار رسالة جديدة وصل:", data);
-
-            // أ) تحديث عداد الـ Navbar فوراً
+            // أ) تحديث العداد
             api.get('chat/unread-count/').then(res => setUnreadCount(res.data.unread_count)).catch(()=>{});
             
-            // ب) إطلاق حدث عالمي عشان لو هو جوه صفحة الشات، اللستة الجانبية تتحدث
+            // ب) تحديث قائمة الشات
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new Event('chat_rooms_updated'));
             }
             
-            // ج) السحر: إرسال "تم الاستلام" للسيرفر عشان الطرف الأول يشوف صحين رمادي
+            // ج) إرسال "تم الاستلام" عشان المرسل يشوف الصحين الرمادي
             if (data && data.id) {
-                console.log("🚀 [GLOBAL CHAT] إرسال تأكيد استلام...");
-                api.post(`chat/messages/${data.id}/delivered/`).catch((e) => console.log("Delivered API Error:", e));
+                api.post(`chat/messages/${data.id}/delivered/`).catch(() => {});
             }
         });
 
@@ -68,7 +60,7 @@ export const useGlobalChat = () => {
             globalChannel.unsubscribe();
             pusher.disconnect();
         };
-    }, [user?.id, isAuthenticated]); // ربط التحديث بحالة تسجيل الدخول
+    }, [user?.id, isAuthenticated]);
 
     return { unreadCount };
 };
