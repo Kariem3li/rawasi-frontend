@@ -11,7 +11,6 @@ export const useChat = (roomId: string) => {
   const { user } = useAuth();
 
   const userRef = useRef(user);
-  // 🚀 السحر الجديد: مرجع هيتعلم الـ ID بتاعك من الداتابيز عشان البوشر ميغلطش أبداً
   const learnedMyIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export const useChat = (roomId: string) => {
         ? response.data
         : (response.data?.results || []);
 
-      // 🚀 الذكاء الاصطناعي: هندور على أي رسالة الباك إند قال إنها بتاعتك (is_me: true) وناخد منها الـ ID بتاعك كضمان!
+      // تأمين الـ ID عشان البوشر ميغلطش أبداً
       const myMsg = fetchedMessages.find((m: any) => m.is_me === true);
       if (myMsg) {
           const senderVal = myMsg.sender?.id || myMsg.sender;
@@ -71,19 +70,17 @@ export const useChat = (roomId: string) => {
 
     channel.bind('new_message', (newMsg: any) => {
       setMessages((prev) => {
-          // لو الرسالة موجودة فعلاً (أو موجودة كنسخة وهمية مؤقتة) هنتجاهلها عشان منع الرعشة
+          // لو الرسالة دي موجودة مش هنضيفها تاني (منع التكرار نهائياً)
           if (prev.some(m => String(m.id) === String(newMsg.id))) {
-              return prev;
+              return prev.map(m => String(m.id) === String(newMsg.id) ? { ...newMsg, is_me: m.is_me } : m);
           }
 
-          // نحدد الآي دي بتاعك بأدق طريقة ممكنة (من المرجع المُتعلم، أو اليوزر، أو اللوكال ستوريدج)
           const currentUserId = learnedMyIdRef.current || String(userRef.current?.id) || localStorage.getItem('user_id');
           const senderId = typeof newMsg.sender === 'object' ? String(newMsg.sender?.id) : String(newMsg.sender);
           
           const isMine = currentUserId ? (senderId === String(currentUserId)) : false;
           const correctedMsg = { ...newMsg, is_me: isMine };
 
-          // إشعار قراءة للطرف التاني
           if (!isMine) {
              api.post(`chat/rooms/${roomId}/read/`).catch(() => {});
           }
@@ -108,31 +105,19 @@ export const useChat = (roomId: string) => {
   }, [roomId]);
 
   const sendMessage = async (content: string) => {
-    // 🚀 التحديث المتفائل: نرسم الرسالة يمين فوووراً وقت الضغط عشان نحسس العميل بسرعة البرق
-    const tempId = `temp_${Date.now()}`;
-    const optimisticMsg = {
-        id: tempId,
-        content: content,
-        created_at: new Date().toISOString(),
-        is_read: false,
-        is_delivered: false,
-        is_me: true, // إجباري يمين
-    };
-
-    setMessages((prev) => [...prev, optimisticMsg]);
-
     try {
       const res = await api.post(`chat/rooms/${roomId}/messages/`, { content });
       const realMsg = { ...res.data, is_me: true };
 
       setMessages((prev) => {
-          // بنشيل النسخة الوهمية ونحط النسخة الحقيقية اللي رجعت من السيرفر بدون أي رعشة
-          const filtered = prev.filter(m => m.id !== tempId && String(m.id) !== String(realMsg.id));
-          return [...filtered, realMsg];
+          // لو البوشر كان أسرع ونزل الرسالة، هنحدثها بس، ولو لسه منزلتش، هنضيفها إحنا
+          const exists = prev.some(m => String(m.id) === String(realMsg.id));
+          if (exists) {
+              return prev.map(m => String(m.id) === String(realMsg.id) ? realMsg : m);
+          }
+          return [...prev, realMsg];
       });
     } catch (error: any) {
-      // لو النت فصل، بنمسح الرسالة الوهمية
-      setMessages((prev) => prev.filter(m => m.id !== tempId));
       if (error.response?.data?.content) alert(error.response.data.content[0]);
     }
   };
