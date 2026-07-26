@@ -4,13 +4,27 @@ import Pusher from 'pusher-js';
 import api from '@/lib/axios';
 import { API_URL } from '@/lib/config';
 import { useAuth } from '@/providers/AuthProvider';
+import { requestFcmToken } from '@/lib/firebase'; // 🚀 استدعاء دالة جلب التوكن
 
 export const useGlobalChat = () => {
     const { isAuthenticated } = useAuth();
     const [unreadCount, setUnreadCount] = useState(0);
     const [serverUserId, setServerUserId] = useState<string | null>(null);
 
-    // 🚀 1. فصل دالة جلب العداد عشان نقدر نناديها براحتنا وقت ما نحب
+    // 🚀 طلب إذن الإشعارات وإرسال الـ Token للباك إند للحفظ
+    useEffect(() => {
+        if (isAuthenticated) {
+            requestFcmToken().then((token) => {
+                if (token) {
+                    api.post('chat/update-fcm-token/', { fcm_token: token })
+                       .then(() => console.log("🔥 FCM Token Saved successfully!"))
+                       .catch(err => console.error("FCM Token Save Error:", err));
+                }
+            });
+        }
+    }, [isAuthenticated]);
+
+    // فصل دالة جلب العداد 
     const fetchUnreadCount = useCallback(() => {
         if (!isAuthenticated) return;
         
@@ -24,11 +38,9 @@ export const useGlobalChat = () => {
            .catch(err => console.error("Unread count error:", err));
     }, [isAuthenticated]);
 
-    // 🚀 2. استدعاء العداد أول مرة، والتصنت على الإشارات اللي جاية من الغرف
+    // استدعاء العداد أول مرة، والتصنت على الإشارات المحدثة للعداد
     useEffect(() => {
         fetchUnreadCount();
-
-        // السلك السحري: أي مكان في الموقع يضرب الإشارة دي، العداد هيتحدث لايف!
         window.addEventListener('update_global_counter', fetchUnreadCount);
         
         return () => {
@@ -36,7 +48,7 @@ export const useGlobalChat = () => {
         };
     }, [fetchUnreadCount]);
 
-    // 🚀 3. إعدادات البوشر (الرادار العام)
+    // إعدادات البوشر (الرادار العام)
     useEffect(() => {
         if (!isAuthenticated || !serverUserId) return;
 
